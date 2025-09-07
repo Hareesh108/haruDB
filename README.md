@@ -1,6 +1,6 @@
 # HaruDB 🚀
 
-**HaruDB** is a fully custom database built from scratch in Go, inspired by PostgreSQL and MySQL.  
+**HaruDB** is a fully custom database built from scratch in Go, inspired by PostgreSQL and SQLite.
 It’s designed to be **client-server, TCP-based, and feature-rich**, supporting SQL-like commands, persistence, indexing, transactions, and more.
 
 ---
