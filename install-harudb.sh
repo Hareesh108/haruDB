@@ -4,7 +4,7 @@
 # Usage: curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/install-harudb.sh | bash
 
 # Set version
-VERSION="v0.0.1"
+VERSION="v0.0.2"
 
 # Detect OS
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
