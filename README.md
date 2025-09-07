@@ -38,7 +38,7 @@ It’s designed to be **client-server, TCP-based, and feature-rich**, supporting
 Run the following command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/install-harudb.sh | bash
+curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/scripts/install-harudb.sh | bash
 ```
 
 ### ❌ Uninstall HaruDB (Native)
@@ -46,7 +46,7 @@ curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/install-harud
 To fully remove HaruDB, including **active server processes, binary, data, logs, and temp files**, run:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/uninstall-harudb.sh | bash
+curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/scripts/uninstall-harudb.sh | bash
 ```
 
 ## 🐳 Run HaruDB via Docker
