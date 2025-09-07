@@ -5,12 +5,11 @@ It’s designed to be **client-server, TCP-based, and feature-rich**, supporting
 
 ---
 
-## ✨ Current Features (v0.1)
+## ✨ Current Features (v0.0.2)
 
 - TCP server with interactive REPL (like `psql`)
 - In-memory storage engine
 - `CREATE TABLE`, `INSERT`, `SELECT` support
-- Docker image for easy setup
 
 ---
 
@@ -31,6 +30,24 @@ It’s designed to be **client-server, TCP-based, and feature-rich**, supporting
 | Docker & Kubernetes deployment   | ✅ Ready      |
 
 ---
+
+## 🐧 Linux / 🍎 macOS Installation (Native)
+
+### 1️⃣ Install HaruDB
+
+Run the following command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/install-harudb.sh | bash
+```
+
+### ❌ Uninstall HaruDB (Native)
+
+To fully remove HaruDB, including **active server processes, binary, data, logs, and temp files**, run:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/uninstall-harudb.sh | bash
+```
 
 ## 🐳 Run HaruDB via Docker
 
@@ -81,30 +98,6 @@ haruDB> SELECT * FROM users;
 id | name
 1  | Hareesh
 2  | Bhittam
-```
-
----
-
-## 🛠️ Build from Source
-
-Clone the repo:
-
-```bash
-git clone git@github.com:Hareesh108/haruDB.git
-cd haruDB
-```
-
-Run the server:
-
-```bash
-go run ./cmd/server
-```
-
-Or build a binary:
-
-```bash
-go build -o harudb ./cmd/server
-./harudb
 ```
 
 ---
