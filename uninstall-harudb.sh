@@ -1,11 +1,16 @@
 #!/bin/bash
 set -e
 
+# Paths
 BINARY_PATH="/usr/local/bin/harudb"
-DATA_DIR="$HOME/.harudb"  # optional data directory for future persistence
+DATA_DIR="$HOME/.harudb"          # Optional data directory for future persistence
+LOG_DIR="$HOME/.harudb_logs"      # Optional logs directory
+TMP_DIR="/tmp/harudb"             # Optional temp files
 
-# Stop running HaruDB processes
-PIDS=$(pgrep -f "$BINARY_PATH") || true
+echo "🚀 Uninstalling HaruDB..."
+
+# Stop all running HaruDB processes
+PIDS=$(pgrep -f "harudb") || true
 if [ -n "$PIDS" ]; then
     echo "Stopping HaruDB processes: $PIDS"
     kill -9 $PIDS
@@ -23,11 +28,25 @@ else
     echo "❌ HaruDB binary not found."
 fi
 
-# Remove optional data directory
+# Remove data directory
 if [ -d "$DATA_DIR" ]; then
     echo "Removing HaruDB data directory at $DATA_DIR..."
     rm -rf "$DATA_DIR"
     echo "✅ Data directory removed."
 fi
 
-echo "🎉 HaruDB uninstalled successfully!"
+# Remove logs directory
+if [ -d "$LOG_DIR" ]; then
+    echo "Removing HaruDB logs directory at $LOG_DIR..."
+    rm -rf "$LOG_DIR"
+    echo "✅ Logs directory removed."
+fi
+
+# Remove temporary files
+if [ -d "$TMP_DIR" ]; then
+    echo "Removing HaruDB temporary files at $TMP_DIR..."
+    rm -rf "$TMP_DIR"
+    echo "✅ Temporary files removed."
+fi
+
+echo "🎉 HaruDB fully uninstalled successfully!"
