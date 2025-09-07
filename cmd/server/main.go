@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"strings"
+
+	"github.com/Hareesh108/haruDB/internal/parser"
 )
 
 func main() {
@@ -18,17 +20,19 @@ func main() {
 
 	fmt.Printf("🚀 HaruDB server started on port %s\n", port)
 
+	engine := parser.NewEngine()
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("Error accepting connection: %v", err)
 			continue
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, engine)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, engine *parser.Engine) {
 	defer conn.Close()
 
 	conn.Write([]byte("Welcome to HaruDB v0.1 🎉\n"))
@@ -39,7 +43,7 @@ func handleConnection(conn net.Conn) {
 		conn.Write([]byte("haruDB> "))
 
 		if !scanner.Scan() {
-			break // client disconnected
+			break
 		}
 		input := strings.TrimSpace(scanner.Text())
 
@@ -48,7 +52,7 @@ func handleConnection(conn net.Conn) {
 			break
 		}
 
-		// For now, just echo back
-		conn.Write([]byte("You said: " + input + "\n"))
+		result := engine.Execute(input)
+		conn.Write([]byte(result + "\n"))
 	}
 }
