@@ -1,3 +1,4 @@
+// internal/parser/simple.go
 package parser
 
 import (
@@ -10,8 +11,8 @@ type Engine struct {
 	DB *storage.Database
 }
 
-func NewEngine() *Engine {
-	return &Engine{DB: storage.NewDatabase()}
+func NewEngine(dataDir string) *Engine {
+	return &Engine{DB: storage.NewDatabase(dataDir)}
 }
 
 func (e *Engine) Execute(input string) string {
@@ -28,7 +29,11 @@ func (e *Engine) Execute(input string) string {
 			return "Syntax error"
 		}
 		header := strings.TrimSpace(parts[0])
-		tableName := strings.Fields(header)[2]
+		fields := strings.Fields(header)
+		if len(fields) < 3 {
+			return "Syntax error"
+		}
+		tableName := fields[2]
 
 		colsRaw := strings.TrimSuffix(parts[1], ")")
 		columns := strings.Split(colsRaw, ",")

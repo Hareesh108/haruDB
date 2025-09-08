@@ -1,3 +1,4 @@
+// internal/storage/memory.go
 package storage
 
 import (
@@ -12,11 +13,18 @@ type Table struct {
 }
 
 type Database struct {
-	Tables map[string]*Table
+	DataDir string
+	Tables  map[string]*Table
 }
 
-func NewDatabase() *Database {
-	return &Database{Tables: make(map[string]*Table)}
+func NewDatabase(dataDir string) *Database {
+	db := &Database{
+		DataDir: dataDir,
+		Tables:  make(map[string]*Table),
+	}
+	// Load any existing .harudb files
+	_ = db.loadTables()
+	return db
 }
 
 func (db *Database) CreateTable(name string, columns []string) string {
@@ -25,6 +33,9 @@ func (db *Database) CreateTable(name string, columns []string) string {
 		return fmt.Sprintf("Table %s already exists", name)
 	}
 	db.Tables[name] = &Table{Name: name, Columns: columns, Rows: [][]string{}}
+	if err := db.saveTable(db.Tables[name]); err != nil {
+		return fmt.Sprintf("Table %s created (warning: failed to persist: %v)", name, err)
+	}
 	return fmt.Sprintf("Table %s created", name)
 }
 
@@ -38,6 +49,9 @@ func (db *Database) Insert(tableName string, values []string) string {
 		return "Column count does not match"
 	}
 	table.Rows = append(table.Rows, values)
+	if err := db.saveTable(table); err != nil {
+		return fmt.Sprintf("1 row inserted (warning: failed to persist: %v)", err)
+	}
 	return "1 row inserted"
 }
 

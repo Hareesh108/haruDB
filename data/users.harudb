@@ -1,0 +1,13 @@
+{
+  "name": "users",
+  "columns": [
+    "id",
+    "name"
+  ],
+  "rows": [
+    [
+      "1",
+      "Hareesh"
+    ]
+  ]
+}
