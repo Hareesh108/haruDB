@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Usage: curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/scripts/uninstall-harudb.sh | bash
+
+
 # Paths
 BINARY_PATH="/usr/local/bin/harudb"
 DATA_DIR="$HOME/.harudb"          # Optional data directory for future persistence

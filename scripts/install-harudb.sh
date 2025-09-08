@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # HaruDB installer script - fully automated
-# Usage: curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/install-harudb.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/scripts/install-harudb.sh | bash
 
 # Set version
 VERSION="v0.0.2"
