@@ -13,6 +13,8 @@ import (
 	"github.com/Hareesh108/haruDB/internal/parser"
 )
 
+const DB_VERSION string = "v0.0.2"
+
 func main() {
 	port := "54321"
 
@@ -47,7 +49,7 @@ func main() {
 func handleConnection(conn net.Conn, engine *parser.Engine) {
 	defer conn.Close()
 
-	conn.Write([]byte("Welcome to HaruDB v0.1 🎉\n"))
+	fmt.Fprintf(conn, "\nWelcome to HaruDB %s 🎉\n", DB_VERSION)
 	conn.Write([]byte("Type 'exit' to quit.\n\n"))
 
 	scanner := bufio.NewScanner(conn)
