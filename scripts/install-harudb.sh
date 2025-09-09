@@ -75,7 +75,7 @@ if nc -z localhost 54321; then
     echo "HaruDB server is running on port 54321."
     echo "Connect using:"
     echo "  haru-cli  (for CLI)"
-    echo "  telnet localhost 54321  (basic connection)"
+    # echo "  telnet localhost 54321  (basic connection)"
 else
     echo "❌ HaruDB server failed to start."
 fi

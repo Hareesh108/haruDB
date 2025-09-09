@@ -16,9 +16,9 @@ echo "⚡ Building HaruDB binaries (Server + CLI)..."
 
 # Define targets
 declare -A TARGETS=(
-  ["linux_amd64"]="linux amd64"
-  ["darwin_amd64"]="darwin amd64"
-  ["windows_amd64"]="windows amd64"
+  ["linux"]="linux amd64"
+  ["darwin"]="darwin amd64"
+  ["windows"]="windows amd64"
 )
 
 # Loop over targets
