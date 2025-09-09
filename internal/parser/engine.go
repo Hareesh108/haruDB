@@ -75,9 +75,7 @@ func (e *Engine) Execute(input string) string {
 		return e.DB.SelectAll(tableName)
 
 	case strings.HasPrefix(upper, "UPDATE"):
-		// UPDATE users SET name = 'NewName' WHERE id = 1
-		// For simplicity, we'll use row index instead of WHERE clause
-		// UPDATE users SET name = 'NewName' ROW 0
+		// Example: UPDATE users SET name = 'NewName', email = 'new@example.com' ROW 0
 		parts := strings.Fields(input)
 		if len(parts) < 6 {
 			return "Syntax error: UPDATE table SET column = value ROW index"
@@ -92,7 +90,7 @@ func (e *Engine) Execute(input string) string {
 				break
 			}
 		}
-		if setIndex == -1 || setIndex+3 >= len(parts) {
+		if setIndex == -1 {
 			return "Syntax error: missing SET clause"
 		}
 
@@ -100,7 +98,6 @@ func (e *Engine) Execute(input string) string {
 		rowIndex := -1
 		for i, part := range parts {
 			if strings.ToUpper(part) == "ROW" && i+1 < len(parts) {
-				// Parse row index
 				if idx, err := strconv.Atoi(parts[i+1]); err == nil {
 					rowIndex = idx
 					break
@@ -111,35 +108,56 @@ func (e *Engine) Execute(input string) string {
 			return "Syntax error: missing ROW index"
 		}
 
-		// Get table to find column index
+		// Get table
 		table, exists := e.DB.Tables[tableName]
 		if !exists {
 			return fmt.Sprintf("Table %s not found", tableName)
 		}
-
-		// Find column index
-		columnName := parts[setIndex+1]
-		columnIndex := -1
-		for i, col := range table.Columns {
-			if col == columnName {
-				columnIndex = i
-				break
-			}
-		}
-		if columnIndex == -1 {
-			return fmt.Sprintf("Column %s not found", columnName)
-		}
-
-		// Get new value
-		newValue := strings.Trim(parts[setIndex+3], "'")
-
-		// Create new row with updated value
-		if rowIndex >= len(table.Rows) {
+		if rowIndex < 0 || rowIndex >= len(table.Rows) {
 			return "Row index out of bounds"
 		}
+
+		// Reconstruct SET clause (everything between SET and ROW)
+		setClause := strings.Join(parts[setIndex+1:], " ")
+		rowClauseIndex := strings.Index(strings.ToUpper(setClause), "ROW")
+		if rowClauseIndex != -1 {
+			setClause = setClause[:rowClauseIndex]
+		}
+		setClause = strings.TrimSpace(setClause)
+
+		// Split multiple assignments by comma
+		assignments := strings.Split(setClause, ",")
 		newRow := make([]string, len(table.Rows[rowIndex]))
 		copy(newRow, table.Rows[rowIndex])
-		newRow[columnIndex] = newValue
+
+		for _, assign := range assignments {
+			assign = strings.TrimSpace(assign)
+			if assign == "" {
+				continue
+			}
+			kv := strings.SplitN(assign, "=", 2)
+			if len(kv) != 2 {
+				return fmt.Sprintf("Invalid assignment: %s", assign)
+			}
+			columnName := strings.TrimSpace(kv[0])
+			value := strings.TrimSpace(kv[1])
+			value = strings.Trim(value, "'")
+
+			// Find column index
+			columnIndex := -1
+			for i, col := range table.Columns {
+				if col == columnName {
+					columnIndex = i
+					break
+				}
+			}
+			if columnIndex == -1 {
+				return fmt.Sprintf("Column %s not found", columnName)
+			}
+
+			// Apply update
+			newRow[columnIndex] = value
+		}
 
 		return e.DB.Update(tableName, rowIndex, newRow)
 

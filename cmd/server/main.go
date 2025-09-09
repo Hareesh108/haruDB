@@ -54,7 +54,8 @@ func handleConnection(conn net.Conn, engine *parser.Engine) {
 
 	scanner := bufio.NewScanner(conn)
 	for {
-		conn.Write([]byte("haruDB> "))
+		// send prompt with newline
+		conn.Write([]byte("haruDB> \n"))
 
 		if !scanner.Scan() {
 			break
@@ -67,6 +68,12 @@ func handleConnection(conn net.Conn, engine *parser.Engine) {
 		}
 
 		result := engine.Execute(input)
-		conn.Write([]byte(result + "\n"))
+
+		if !strings.HasSuffix(result, "\n") {
+			result += "\n"
+		}
+
+		// send result
+		conn.Write([]byte(result))
 	}
 }
