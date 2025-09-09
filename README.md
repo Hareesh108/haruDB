@@ -48,7 +48,7 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 | Transactions & ACID compliance  | 🔜 Planned    |
 | Concurrency & locking            | 🔜 Planned    |
 | Custom wire protocol             | 🔜 Planned    |
-| CLI client (`haru-cli`)          | 🔜 Planned    |
+| CLI client (`haru-cli`)          | ✅ **Implemented** |
 | Authentication & TLS             | 🔜 Planned    |
 | Multi-user support               | 🔜 Planned    |
 | Backup & restore                 | 🔜 Planned    |
@@ -102,6 +102,12 @@ Use **Telnet** (basic) or later, the HaruDB CLI client:
 
 ```bash
 telnet localhost 54321
+```
+
+Use **haru-cli** the HaruDB CLI client:
+
+```bash
+haru-cli
 ```
 
 Example session:
