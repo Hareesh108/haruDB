@@ -7,7 +7,7 @@
 set -e
 
 DB_VERSION="v0.0.3"
-DIST_DIR="./dist"
+DIST_DIR="./binaries"
 
 # Create dist directory
 mkdir -p $DIST_DIR
