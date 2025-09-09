@@ -13,7 +13,7 @@ import (
 	"github.com/Hareesh108/haruDB/internal/parser"
 )
 
-const DB_VERSION string = "v0.0.2"
+const DB_VERSION string = "v0.0.3"
 
 func main() {
 	port := "54321"
