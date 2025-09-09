@@ -26,6 +26,12 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
   - `UPDATE` - Modify existing rows by index
   - `DELETE` - Remove rows by index
 
+### 🚀 **Indexes & Query Optimization**
+
+- `CREATE INDEX ON <table> (<column>)` - Build an in-memory hash index
+- `SELECT ... WHERE <column> = 'value'` - Equality filters use indexes when available
+- Index metadata persisted; indexes are rebuilt on startup
+
 ### 🔒 **Data Integrity & Recovery**
 
 - **Write-Ahead Logging (WAL)** ensures all changes are logged before being applied
@@ -43,7 +49,7 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 | Write-Ahead Logging (WAL)        | ✅ **Implemented** |
 | Crash recovery                   | ✅ **Implemented** |
 | Basic SQL operations (CRUD)      | ✅ **Implemented** |
-| Indexes & query optimization     | 🔜 Planned    |
+| Indexes & query optimization     | ✅ **Implemented** |
 | Advanced WHERE clauses           | 🔜 Planned    |
 | Transactions & ACID compliance  | 🔜 Planned    |
 | Concurrency & locking            | 🔜 Planned    |
@@ -166,7 +172,7 @@ Table users not found
 | **Go Native** | ✅ | ❌ | ❌ |
 | **Docker Ready** | ✅ | ✅ | ✅ |
 | **ACID Transactions** | 🔜 | ✅ | ✅ |
-| **Advanced Indexing** | 🔜 | ✅ | ✅ |
+| **Advanced Indexing** | ✅ | ✅ | ✅ |
 | **Concurrent Access** | 🔜 | Limited | ✅ |
 
 ---
@@ -195,6 +201,7 @@ HaruDB implements a robust WAL system that ensures data durability and crash rec
 - **String-Based Parser**: Simple but effective command parsing
 - **Error Handling**: Comprehensive validation and user-friendly error messages
 - **Extensible Design**: Easy to add new SQL operations
+- **Indexing & WHERE**: Supports `CREATE INDEX` and `SELECT ... WHERE col = 'value'`
 
 ---
 
@@ -233,6 +240,10 @@ INSERT INTO products VALUES (2, 'Mouse', '29.99');
 -- Query data
 SELECT * FROM products;
 
+-- Create an index and run indexed queries
+CREATE INDEX ON products (name);
+SELECT * FROM products WHERE name = 'Laptop';
+
 -- Update data
 UPDATE products SET price = '1099.99' ROW 0;
 
@@ -241,6 +252,24 @@ DELETE FROM products ROW 1;
 
 -- Drop table
 DROP TABLE products;
+```
+
+### **4. End-to-End Example (Indexes & WHERE)**
+
+```sql
+CREATE TABLE users (id, name, email);
+INSERT INTO users VALUES (1, 'Hareesh', 'hareesh@example.com');
+INSERT INTO users VALUES (2, 'Bhittam', 'bhittam@example.com');
+INSERT INTO users VALUES (3, 'Alice', 'alice@example.com');
+
+-- Create an index on email
+CREATE INDEX ON users (email);
+
+-- Uses index
+SELECT * FROM users WHERE email = 'bhittam@example.com';
+
+-- Falls back to full scan (no index on name yet)
+SELECT * FROM users WHERE name = 'Alice';
 ```
 
 ---
