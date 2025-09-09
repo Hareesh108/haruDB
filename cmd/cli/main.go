@@ -47,8 +47,6 @@ func main() {
 		}
 	}
 
-	fmt.Println("Connected to HaruDB 🎉 (history enabled with ↑↓)")
-
 	for {
 		// show CLI prompt
 		input, err := line.Prompt("haruDB> ")
