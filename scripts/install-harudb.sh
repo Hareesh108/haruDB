@@ -4,7 +4,7 @@
 # Usage: curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/scripts/install-harudb.sh | bash
 
 # Set version
-VERSION="v0.0.2"
+DB_VERSION="v0.0.3"
 
 # Detect OS
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
@@ -21,7 +21,7 @@ else
     exit 1
 fi
 
-DOWNLOAD_URL="https://github.com/Hareesh108/haruDB/releases/download/$VERSION/$BINARY_NAME"
+DOWNLOAD_URL="https://github.com/Hareesh108/haruDB/releases/download/$DB_VERSION/$BINARY_NAME"
 
 # Download binary
 echo "⬇️ Downloading HaruDB ($BINARY_NAME)..."
