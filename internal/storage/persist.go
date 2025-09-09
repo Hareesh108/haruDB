@@ -11,9 +11,10 @@ import (
 
 // onDiskTable is the JSON layout stored in .harudb files
 type onDiskTable struct {
-	Name    string     `json:"name"`
-	Columns []string   `json:"columns"`
-	Rows    [][]string `json:"rows"`
+	Name           string     `json:"name"`
+	Columns        []string   `json:"columns"`
+	Rows           [][]string `json:"rows"`
+	IndexedColumns []string   `json:"indexed_columns,omitempty"`
 }
 
 // tablePath returns the target .harudb file path for a table
@@ -28,9 +29,10 @@ func (db *Database) tablePath(name string) string {
 func (db *Database) saveTable(t *Table) error {
 	// Prepare serialized payload
 	payload := onDiskTable{
-		Name:    t.Name,
-		Columns: t.Columns,
-		Rows:    t.Rows,
+		Name:           t.Name,
+		Columns:        t.Columns,
+		Rows:           t.Rows,
+		IndexedColumns: t.IndexedColumns,
 	}
 	data, err := json.MarshalIndent(&payload, "", "  ")
 	if err != nil {
@@ -122,11 +124,15 @@ func (db *Database) loadTables() error {
 		if disk.Name != "" {
 			name = strings.ToLower(disk.Name)
 		}
-		db.Tables[name] = &Table{
-			Name:    name,
-			Columns: disk.Columns,
-			Rows:    disk.Rows,
+		t := &Table{
+			Name:           name,
+			Columns:        disk.Columns,
+			Rows:           disk.Rows,
+			IndexedColumns: disk.IndexedColumns,
+			Indexes:        make(map[string]map[string][]int),
 		}
+		db.Tables[name] = t
+		db.rebuildAllIndexes(t)
 	}
 	return nil
 }

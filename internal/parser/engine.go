@@ -28,6 +28,23 @@ func (e *Engine) Execute(input string) string {
 	upper := strings.ToUpper(input)
 
 	switch {
+	case strings.HasPrefix(upper, "CREATE INDEX"):
+		// CREATE INDEX ON users (email)
+		parts := strings.SplitN(input, "(", 2)
+		if len(parts) < 2 {
+			return ErrSyntaxError
+		}
+		header := strings.TrimSpace(parts[0])
+		seg := strings.Fields(header)
+		if len(seg) < 4 { // CREATE INDEX ON <table>
+			return ErrSyntaxError
+		}
+		tableName := strings.ToLower(seg[3])
+		col := strings.TrimSpace(parts[1])
+		col = strings.TrimSuffix(col, ")")
+		col = strings.TrimSpace(col)
+		return e.DB.CreateIndex(tableName, col)
+
 	case strings.HasPrefix(upper, "CREATE TABLE"):
 		// CREATE TABLE users (id, name)
 		parts := strings.SplitN(input, "(", 2)
@@ -66,13 +83,35 @@ func (e *Engine) Execute(input string) string {
 		return e.DB.Insert(tableName, values)
 
 	case strings.HasPrefix(upper, "SELECT * FROM"):
-		// SELECT * FROM users
+		// SELECT * FROM users [WHERE col = 'val']
+		// Basic WHERE support
 		parts := strings.Fields(input)
 		if len(parts) < 4 {
 			return ErrSyntaxError
 		}
 		tableName := strings.ToLower(parts[3])
-		return e.DB.SelectAll(tableName)
+		// Check for WHERE clause
+		whereIdx := -1
+		for i, p := range parts {
+			if strings.ToUpper(p) == "WHERE" {
+				whereIdx = i
+				break
+			}
+		}
+		if whereIdx == -1 {
+			return e.DB.SelectAll(tableName)
+		}
+		// Expect: WHERE <col> = <value>
+		if whereIdx+3 >= len(parts) {
+			return ErrSyntaxError
+		}
+		col := parts[whereIdx+1]
+		op := parts[whereIdx+2]
+		val := strings.Trim(parts[whereIdx+3], "'\"")
+		if op != "=" {
+			return "Only equality WHERE supported"
+		}
+		return e.DB.SelectWhere(tableName, col, val)
 
 	case strings.HasPrefix(upper, "UPDATE"):
 		// Example: UPDATE users SET name = 'NewName', email = 'new@example.com' ROW 0

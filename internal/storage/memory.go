@@ -16,6 +16,10 @@ type Table struct {
 	Name    string
 	Columns []string
 	Rows    [][]string
+	// IndexedColumns lists column names that are indexed
+	IndexedColumns []string
+	// Indexes maps column name -> value -> list of row indexes
+	Indexes map[string]map[string][]int
 }
 
 type Database struct {
@@ -68,7 +72,7 @@ func (db *Database) CreateTable(name string, columns []string) string {
 	}
 
 	// Apply changes to memory
-	db.Tables[name] = &Table{Name: name, Columns: columns, Rows: [][]string{}}
+	db.Tables[name] = &Table{Name: name, Columns: columns, Rows: [][]string{}, IndexedColumns: []string{}, Indexes: make(map[string]map[string][]int)}
 
 	// Persist to disk
 	if err := db.saveTable(db.Tables[name]); err != nil {
@@ -107,6 +111,8 @@ func (db *Database) Insert(tableName string, values []string) string {
 
 	// Apply changes to memory
 	table.Rows = append(table.Rows, values)
+	// Maintain indexes for this row
+	db.applyIndexesOnInsert(table, len(table.Rows)-1)
 
 	// Persist to disk
 	if err := db.saveTable(table); err != nil {
@@ -169,6 +175,8 @@ func (db *Database) Update(tableName string, rowIndex int, values []string) stri
 
 	// Apply changes to memory
 	table.Rows[rowIndex] = values
+	// Rebuild indexes as row positions and values may have changed
+	db.rebuildAllIndexes(table)
 
 	// Persist to disk
 	if err := db.saveTable(table); err != nil {
@@ -209,6 +217,8 @@ func (db *Database) Delete(tableName string, rowIndex int) string {
 
 	// Apply changes to memory
 	table.Rows = append(table.Rows[:rowIndex], table.Rows[rowIndex+1:]...)
+	// Rebuild indexes as row positions shifted
+	db.rebuildAllIndexes(table)
 
 	// Persist to disk
 	if err := db.saveTable(table); err != nil {
@@ -257,4 +267,187 @@ func (db *Database) DropTable(tableName string) string {
 	}
 
 	return fmt.Sprintf("Table %s dropped", tableName)
+}
+
+// CreateIndex creates an in-memory hash index on a given column and
+// persists the indexed column metadata so indexes can be rebuilt on load.
+func (db *Database) CreateIndex(tableName string, columnName string) string {
+	tableName = strings.ToLower(tableName)
+	columnName = strings.TrimSpace(columnName)
+
+	table, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+
+	// Validate column exists
+	colIdx := -1
+	for i, c := range table.Columns {
+		if c == columnName {
+			colIdx = i
+			break
+		}
+	}
+	if colIdx == -1 {
+		return fmt.Sprintf("Column %s not found", columnName)
+	}
+
+	// Initialize maps if needed
+	if table.Indexes == nil {
+		table.Indexes = make(map[string]map[string][]int)
+	}
+
+	if _, ok := table.Indexes[columnName]; !ok {
+		table.Indexes[columnName] = make(map[string][]int)
+	}
+
+	// Add to IndexedColumns if not present
+	found := false
+	for _, ic := range table.IndexedColumns {
+		if ic == columnName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		table.IndexedColumns = append(table.IndexedColumns, columnName)
+	}
+
+	// Build index for this column
+	db.buildIndexForColumn(table, columnName)
+
+	// Persist table metadata so indexes can be rebuilt on restart
+	if err := db.saveTable(table); err != nil {
+		return fmt.Sprintf("Index created with warnings: failed to persist: %v", err)
+	}
+
+	return fmt.Sprintf("Index created on %s(%s)", tableName, columnName)
+}
+
+// SelectWhere returns rows where columnName == value. Uses index if available.
+func (db *Database) SelectWhere(tableName, columnName, value string) string {
+	tableName = strings.ToLower(tableName)
+	table, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+
+	// Header
+	result := strings.Join(table.Columns, " | ") + "\n"
+
+	// If index exists, use it
+	if table.Indexes != nil {
+		if idxMap, ok := table.Indexes[columnName]; ok {
+			if rowIdxs, ok2 := idxMap[value]; ok2 {
+				for _, ri := range rowIdxs {
+					if ri >= 0 && ri < len(table.Rows) {
+						result += strings.Join(table.Rows[ri], " | ") + "\n"
+					}
+				}
+				if len(rowIdxs) == 0 {
+					result += "(no rows)\n"
+				}
+				return result
+			}
+			// no matching value
+			result += "(no rows)\n"
+			return result
+		}
+	}
+
+	// Fallback: full scan
+	colIdx := -1
+	for i, c := range table.Columns {
+		if c == columnName {
+			colIdx = i
+			break
+		}
+	}
+	if colIdx == -1 {
+		return fmt.Sprintf("Column %s not found", columnName)
+	}
+	matched := 0
+	for _, row := range table.Rows {
+		if row[colIdx] == value {
+			result += strings.Join(row, " | ") + "\n"
+			matched++
+		}
+	}
+	if matched == 0 {
+		result += "(no rows)\n"
+	}
+	return result
+}
+
+// buildIndexForColumn builds index for a specific column from scratch
+func (db *Database) buildIndexForColumn(table *Table, columnName string) {
+	if table.Indexes == nil {
+		table.Indexes = make(map[string]map[string][]int)
+	}
+	idx, ok := table.Indexes[columnName]
+	if !ok {
+		idx = make(map[string][]int)
+		table.Indexes[columnName] = idx
+	} else {
+		// reset existing
+		for k := range idx {
+			delete(idx, k)
+		}
+	}
+	// find column index
+	colIdx := -1
+	for i, c := range table.Columns {
+		if c == columnName {
+			colIdx = i
+			break
+		}
+	}
+	if colIdx == -1 {
+		return
+	}
+	for ri, row := range table.Rows {
+		if colIdx < len(row) {
+			val := row[colIdx]
+			idx[val] = append(idx[val], ri)
+		}
+	}
+}
+
+// rebuildAllIndexes rebuilds all configured indexes for a table
+func (db *Database) rebuildAllIndexes(table *Table) {
+	if table == nil || len(table.IndexedColumns) == 0 {
+		return
+	}
+	for _, col := range table.IndexedColumns {
+		db.buildIndexForColumn(table, col)
+	}
+}
+
+// applyIndexesOnInsert updates indexes for a newly inserted row at rowIndex
+func (db *Database) applyIndexesOnInsert(table *Table, rowIndex int) {
+	if table == nil || len(table.IndexedColumns) == 0 {
+		return
+	}
+	row := table.Rows[rowIndex]
+	for _, col := range table.IndexedColumns {
+		// find column index
+		colIdx := -1
+		for i, c := range table.Columns {
+			if c == col {
+				colIdx = i
+				break
+			}
+		}
+		if colIdx == -1 || colIdx >= len(row) {
+			continue
+		}
+		val := row[colIdx]
+		if table.Indexes == nil {
+			table.Indexes = make(map[string]map[string][]int)
+		}
+		if _, ok := table.Indexes[col]; !ok {
+			table.Indexes[col] = make(map[string][]int)
+		}
+		table.Indexes[col][val] = append(table.Indexes[col][val], rowIndex)
+	}
 }
