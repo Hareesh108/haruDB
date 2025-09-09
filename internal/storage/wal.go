@@ -233,6 +233,7 @@ func (wm *WALManager) replayEntry(db *Database, entry *WALEntry) error {
 					Columns: colStrs,
 					Rows:    [][]string{},
 				}
+				_ = db.saveTable(db.Tables[entry.TableName])
 			}
 		}
 
@@ -245,6 +246,7 @@ func (wm *WALManager) replayEntry(db *Database, entry *WALEntry) error {
 				}
 				if table, exists := db.Tables[entry.TableName]; exists {
 					table.Rows = append(table.Rows, valStrs)
+					_ = db.saveTable(table)
 				}
 			}
 		}
@@ -260,6 +262,7 @@ func (wm *WALManager) replayEntry(db *Database, entry *WALEntry) error {
 					if table, exists := db.Tables[entry.TableName]; exists {
 						if int(rowIndex) < len(table.Rows) {
 							table.Rows[int(rowIndex)] = valStrs
+							_ = db.saveTable(table)
 						}
 					}
 				}
@@ -273,6 +276,7 @@ func (wm *WALManager) replayEntry(db *Database, entry *WALEntry) error {
 					if int(rowIndex) < len(table.Rows) {
 						// Remove row at index
 						table.Rows = append(table.Rows[:int(rowIndex)], table.Rows[int(rowIndex)+1:]...)
+						_ = db.saveTable(table)
 					}
 				}
 			}
@@ -280,6 +284,7 @@ func (wm *WALManager) replayEntry(db *Database, entry *WALEntry) error {
 
 	case WAL_DROP_TABLE:
 		delete(db.Tables, entry.TableName)
+		os.Remove(db.tablePath(entry.TableName))
 
 	case WAL_CHECKPOINT:
 		// Update checkpoint time

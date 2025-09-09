@@ -6,7 +6,7 @@
 
 set -e
 
-VERSION="v0.0.2"
+DB_VERSION="v0.0.3"
 DIST_DIR="./dist"
 
 # Create dist directory
@@ -16,15 +16,15 @@ echo "⚡ Building HaruDB binaries..."
 
 # Linux
 echo "Building for Linux..."
-GOOS=linux GOARCH=amd64 go build -o $DIST_DIR/harudb-linux ./cmd/server
+GOOS=linux GOARCH=amd64 go build -o $DIST_DIR/harudb-linux ./../cmd/server
 
 # macOS
 echo "Building for macOS..."
-GOOS=darwin GOARCH=amd64 go build -o $DIST_DIR/harudb-macos ./cmd/server
+GOOS=darwin GOARCH=amd64 go build -o $DIST_DIR/harudb-macos ./../cmd/server
 
 # Windows
 echo "Building for Windows..."
-GOOS=windows GOARCH=amd64 go build -o $DIST_DIR/harudb-windows.exe ./cmd/server
+GOOS=windows GOARCH=amd64 go build -o $DIST_DIR/harudb-windows.exe ./../cmd/server
 
 echo "✅ Build complete. Binaries stored in $DIST_DIR:"
 
