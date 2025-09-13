@@ -50,7 +50,7 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 | Crash recovery                   | ✅ **Implemented** |
 | Basic SQL operations (CRUD)      | ✅ **Implemented** |
 | Indexes & query optimization     | ✅ **Implemented** |
-| Advanced WHERE clauses           | 🔜 Planned    |
+| Advanced WHERE clauses           | ✅ **Implemented**    |
 | Transactions & ACID compliance  | 🔜 Planned    |
 | Concurrency & locking            | 🔜 Planned    |
 | Custom wire protocol             | 🔜 Planned    |
@@ -270,7 +270,21 @@ SELECT * FROM users WHERE email = 'bhittam@example.com';
 
 -- Falls back to full scan (no index on name yet)
 SELECT * FROM users WHERE name = 'Alice';
+
 ```
+
+## Advanced WHERE Clauses
+
+Your Bash demo shows that HaruDB can now handle **rich conditional queries** well beyond simple equality.
+Key capabilities—illustrated by the commands in your script:
+
+| Capability               | Example from your script                                                                   | What it means                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| **Comparison operators** | `SELECT * FROM employees WHERE age > 25;`                                                  | `<`, `>`, `<=`, `>=`, `!=` work on numbers and strings.                                         |
+| **Pattern matching**     | `SELECT * FROM employees WHERE name LIKE 'J%';`                                            | `LIKE`, `%` (wildcard), `_` (single char) for flexible text search.                             |
+| **Logical operators**    | `SELECT * FROM employees WHERE age > 25 AND department = 'Engineering';`                   | Combine multiple conditions with `AND`, `OR`, and parentheses for grouping.                     |
+| **Complex combinations** | `SELECT * FROM employees WHERE department = 'Engineering' AND (age > 30 OR salary > 60000);` | Mix nested logic for precise filtering.                                                         |
+| **Edge cases**           | `SELECT * FROM employees WHERE age > 100;`                                                 | Returns empty sets gracefully, supports lexicographic string
 
 ---
 
@@ -378,5 +392,3 @@ Contributions are welcome!
 HaruDB is currently in **active development** and includes robust persistence and crash recovery features.
 While the core functionality is stable, it's recommended for **development and testing environments**.
 For production use, ensure thorough testing and consider the current feature limitations.
-
-**Current Status**: ✅ Persistence & WAL | 🔜 Full ACID Transactions | 🔜 Advanced Querying
