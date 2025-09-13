@@ -5,7 +5,7 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 
 ---
 
-## ✨ Current Features (v0.0.3)
+## ✨ Current Features (v0.0.4)
 
 ### 🏗️ **Core Architecture**
 
@@ -119,9 +119,10 @@ haru-cli
 Example session:
 
 ```
-Welcome to HaruDB v0.0.3 🎉
+Welcome to HaruDB v0.0.4 🎉
 Type 'exit' to quit.
 
+haruDB>
 haruDB> CREATE TABLE users (id, name, email);
 Table users created
 

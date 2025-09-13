@@ -6,7 +6,7 @@
 
 set -e
 
-DB_VERSION="v0.0.3"
+DB_VERSION="v0.0.4"
 DIST_DIR="./binaries"
 
 # Create dist directory
