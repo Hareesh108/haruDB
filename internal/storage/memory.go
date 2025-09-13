@@ -379,6 +379,49 @@ func (db *Database) SelectWhere(tableName, columnName, value string) string {
 	return result
 }
 
+// SelectWhereAdvanced returns rows matching complex WHERE conditions
+func (db *Database) SelectWhereAdvanced(tableName string, whereExpr interface{}) string {
+	tableName = strings.ToLower(tableName)
+	table, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+
+	// Build column index map
+	columnIndexes := make(map[string]int)
+	for i, col := range table.Columns {
+		columnIndexes[col] = i
+	}
+
+	// Header
+	result := strings.Join(table.Columns, " | ") + "\n"
+
+	// Evaluate each row against the WHERE expression
+	matched := 0
+	for _, row := range table.Rows {
+		// Use reflection to call EvaluateExpression method
+		if expr, ok := whereExpr.(interface {
+			EvaluateExpression([]string, map[string]int) (bool, error)
+		}); ok {
+			match, err := expr.EvaluateExpression(row, columnIndexes)
+			if err != nil {
+				return fmt.Sprintf("Error evaluating WHERE condition: %v", err)
+			}
+			if match {
+				result += strings.Join(row, " | ") + "\n"
+				matched++
+			}
+		} else {
+			return "Invalid WHERE expression type"
+		}
+	}
+
+	if matched == 0 {
+		result += "(no rows)\n"
+	}
+	return result
+}
+
 // buildIndexForColumn builds index for a specific column from scratch
 func (db *Database) buildIndexForColumn(table *Table, columnName string) {
 	if table.Indexes == nil {

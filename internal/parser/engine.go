@@ -83,13 +83,13 @@ func (e *Engine) Execute(input string) string {
 		return e.DB.Insert(tableName, values)
 
 	case strings.HasPrefix(upper, "SELECT * FROM"):
-		// SELECT * FROM users [WHERE col = 'val']
-		// Basic WHERE support
+		// SELECT * FROM users [WHERE conditions]
 		parts := strings.Fields(input)
 		if len(parts) < 4 {
 			return ErrSyntaxError
 		}
 		tableName := strings.ToLower(parts[3])
+
 		// Check for WHERE clause
 		whereIdx := -1
 		for i, p := range parts {
@@ -101,17 +101,18 @@ func (e *Engine) Execute(input string) string {
 		if whereIdx == -1 {
 			return e.DB.SelectAll(tableName)
 		}
-		// Expect: WHERE <col> = <value>
-		if whereIdx+3 >= len(parts) {
-			return ErrSyntaxError
+
+		// Extract WHERE clause
+		whereClause := strings.Join(parts[whereIdx+1:], " ")
+
+		// Parse advanced WHERE clause
+		whereExpr, err := ParseWhereClause(whereClause)
+		if err != nil {
+			return fmt.Sprintf("WHERE clause error: %v", err)
 		}
-		col := parts[whereIdx+1]
-		op := parts[whereIdx+2]
-		val := strings.Trim(parts[whereIdx+3], "'\"")
-		if op != "=" {
-			return "Only equality WHERE supported"
-		}
-		return e.DB.SelectWhere(tableName, col, val)
+
+		// Use advanced WHERE evaluation
+		return e.DB.SelectWhereAdvanced(tableName, whereExpr)
 
 	case strings.HasPrefix(upper, "UPDATE"):
 		// Example: UPDATE users SET name = 'NewName', email = 'new@example.com' ROW 0
