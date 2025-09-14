@@ -3,7 +3,6 @@ package parser
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 )
 

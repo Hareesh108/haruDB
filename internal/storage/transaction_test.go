@@ -221,14 +221,14 @@ func TestTransactionACID(t *testing.T) {
 		db.Insert("accounts", []string{"2", "50"})
 
 		// Begin transaction
-		tx, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction: %v", err)
 		}
 
 		// Transfer money (debit account 1, credit account 2)
-		db.UpdateTx("accounts", 0, []string{"1", "90"})  // Debit 10
-		db.UpdateTx("accounts", 1, []string{"2", "60"})  // Credit 10
+		db.UpdateTx("accounts", 0, []string{"1", "90"}) // Debit 10
+		db.UpdateTx("accounts", 1, []string{"2", "60"}) // Credit 10
 
 		// Rollback transaction
 		err = db.RollbackTransaction()
@@ -251,7 +251,7 @@ func TestTransactionACID(t *testing.T) {
 		db.CreateTable("products", []string{"id", "name", "price"})
 
 		// Begin transaction
-		tx, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction: %v", err)
 		}
@@ -286,7 +286,7 @@ func TestTransactionACID(t *testing.T) {
 		db.Insert("inventory", []string{"1", "10"})
 
 		// Begin first transaction
-		tx1, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction 1: %v", err)
 		}
@@ -295,7 +295,7 @@ func TestTransactionACID(t *testing.T) {
 		db.UpdateTx("inventory", 0, []string{"1", "8"})
 
 		// Begin second transaction
-		tx2, err := db.BeginTransaction(ReadCommitted)
+		_, err = db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction 2: %v", err)
 		}
@@ -330,7 +330,7 @@ func TestTransactionACID(t *testing.T) {
 		db.CreateTable("logs", []string{"id", "message"})
 
 		// Begin transaction
-		tx, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction: %v", err)
 		}
@@ -373,13 +373,13 @@ func TestTransactionEdgeCases(t *testing.T) {
 		db.CreateTable("test", []string{"id", "value"})
 
 		// Begin first transaction
-		tx1, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction 1: %v", err)
 		}
 
 		// Try to begin second transaction (should fail or be handled gracefully)
-		tx2, err := db.BeginTransaction(ReadCommitted)
+		_, err = db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			// This is expected behavior - only one transaction at a time
 			t.Logf("Expected error for nested transaction: %v", err)
@@ -415,7 +415,7 @@ func TestTransactionEdgeCases(t *testing.T) {
 
 	t.Run("RollbackToNonexistentSavepoint", func(t *testing.T) {
 		// Begin transaction
-		tx, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction: %v", err)
 		}
@@ -435,7 +435,7 @@ func TestTransactionEdgeCases(t *testing.T) {
 		db.CreateTable("large_test", []string{"id", "data"})
 
 		// Begin transaction
-		tx, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction: %v", err)
 		}
@@ -463,7 +463,7 @@ func TestTransactionEdgeCases(t *testing.T) {
 		db.CreateTable("timeout_test", []string{"id", "value"})
 
 		// Begin transaction
-		tx, err := db.BeginTransaction(ReadCommitted)
+		_, err := db.BeginTransaction(ReadCommitted)
 		if err != nil {
 			t.Fatalf("Failed to begin transaction: %v", err)
 		}
