@@ -52,10 +52,14 @@ func NewDatabase(dataDir string) *Database {
 	// Load any existing .harudb files first
 	_ = db.loadTables()
 
-	// Replay WAL entries if WAL is available (this will apply any changes not yet persisted)
+	// Replay WAL entries if WAL is available (only replay uncommitted transactions)
 	if db.WAL != nil {
 		if err := db.WAL.ReplayWAL(db); err != nil {
 			fmt.Printf("Warning: Failed to replay WAL: %v\n", err)
+		}
+		// Clear WAL after successful replay to prevent duplicates
+		if err := db.WAL.TruncateWAL(); err != nil {
+			fmt.Printf("Warning: Failed to truncate WAL: %v\n", err)
 		}
 	}
 
@@ -143,6 +147,71 @@ func (db *Database) SelectAll(tableName string) string {
 		return fmt.Sprintf(ErrTableNotFound, tableName)
 	}
 
+	// If we're in a transaction, show the current state including uncommitted changes
+	if db.currentTransaction != nil {
+		// Apply transaction operations temporarily for display
+		tempTable := &Table{
+			Name:    table.Name,
+			Columns: make([]string, len(table.Columns)),
+			Rows:    make([][]string, len(table.Rows)),
+		}
+		copy(tempTable.Columns, table.Columns)
+		for i, row := range table.Rows {
+			tempTable.Rows[i] = make([]string, len(row))
+			copy(tempTable.Rows[i], row)
+		}
+
+		// Apply transaction operations to temp table
+		for _, op := range db.currentTransaction.Operations {
+			if op.TableName == tableName {
+				switch op.Type {
+				case WAL_INSERT:
+					if data, ok := op.Data.(map[string]interface{}); ok {
+						if values, ok := data["values"].([]interface{}); ok {
+							valStrs := make([]string, len(values))
+							for i, val := range values {
+								valStrs[i] = val.(string)
+							}
+							tempTable.Rows = append(tempTable.Rows, valStrs)
+						}
+					}
+				case WAL_UPDATE:
+					if data, ok := op.Data.(map[string]interface{}); ok {
+						if rowIndex, ok := data["row_index"].(float64); ok {
+							if values, ok := data["values"].([]interface{}); ok {
+								valStrs := make([]string, len(values))
+								for i, val := range values {
+									valStrs[i] = val.(string)
+								}
+								if int(rowIndex) < len(tempTable.Rows) {
+									tempTable.Rows[int(rowIndex)] = valStrs
+								}
+							}
+						}
+					}
+				case WAL_DELETE:
+					if data, ok := op.Data.(map[string]interface{}); ok {
+						if rowIndex, ok := data["row_index"].(float64); ok {
+							if int(rowIndex) < len(tempTable.Rows) {
+								tempTable.Rows = append(tempTable.Rows[:int(rowIndex)], tempTable.Rows[int(rowIndex)+1:]...)
+							}
+						}
+					}
+				}
+			}
+		}
+
+		result := strings.Join(tempTable.Columns, " | ") + "\n"
+		for _, row := range tempTable.Rows {
+			result += strings.Join(row, " | ") + "\n"
+		}
+		if len(tempTable.Rows) == 0 {
+			result += "(no rows)\n"
+		}
+		return result
+	}
+
+	// Normal non-transactional behavior
 	result := strings.Join(table.Columns, " | ") + "\n"
 	for _, row := range table.Rows {
 		result += strings.Join(row, " | ") + "\n"
