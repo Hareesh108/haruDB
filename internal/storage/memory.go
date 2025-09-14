@@ -704,7 +704,7 @@ func (db *Database) UpdateTx(tableName string, rowIndex int, values []string) st
 	// If we're in a transaction, add operation to transaction
 	if db.currentTransaction != nil {
 		data := map[string]interface{}{
-			"row_index": rowIndex,
+			"row_index": float64(rowIndex),
 			"values":    values,
 		}
 		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_UPDATE, tableName, data); err != nil {
@@ -732,7 +732,7 @@ func (db *Database) DeleteTx(tableName string, rowIndex int) string {
 	// If we're in a transaction, add operation to transaction
 	if db.currentTransaction != nil {
 		data := map[string]interface{}{
-			"row_index": rowIndex,
+			"row_index": float64(rowIndex),
 		}
 		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_DELETE, tableName, data); err != nil {
 			return fmt.Sprintf("Failed to add operation to transaction: %v", err)
