@@ -17,7 +17,7 @@ fi
 echo "🚀 Building HaruDB Docker image for $VERSION ..."
 
 # Build the versioned image
-docker build -t "$IMAGE_NAME:$VERSION" .
+docker build  -t "$IMAGE_NAME:$VERSION" ../
 
 # Tag as latest
 docker tag "$IMAGE_NAME:$VERSION" "$IMAGE_NAME:latest"
