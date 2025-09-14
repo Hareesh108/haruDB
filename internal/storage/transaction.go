@@ -106,40 +106,58 @@ func (tm *TransactionManager) GetTransaction(txID string) (*Transaction, bool) {
 
 // CommitTransaction commits a transaction
 func (tm *TransactionManager) CommitTransaction(txID string) error {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	fmt.Printf("[COMMIT] start txID=%s", txID)
 
+	// 1️⃣ Grab the transaction safely
+	fmt.Printf("[COMMIT] locking tm.mu to fetch tx")
+	tm.mu.Lock()
 	tx, exists := tm.transactions[txID]
 	if !exists {
+		tm.mu.Unlock()
+		fmt.Printf("[COMMIT] tx %s not found", txID)
 		return fmt.Errorf("transaction %s not found", txID)
 	}
+	fmt.Printf("[COMMIT] tx %s fetched, releasing tm.mu", txID)
+	tm.mu.Unlock()
 
+	// 2️⃣ Lock the transaction itself
+	fmt.Printf("[COMMIT] locking tx.mu")
 	tx.mu.Lock()
-	defer tx.mu.Unlock()
+	defer func() {
+		fmt.Printf("[COMMIT] unlocked tx.mu for %s", txID)
+		tx.mu.Unlock()
+	}()
 
 	if tx.State != TransactionActive {
+		fmt.Printf("[COMMIT] tx %s not active (state=%d)", txID, tx.State)
 		return fmt.Errorf("transaction %s is not active (state: %d)", txID, tx.State)
 	}
+	fmt.Printf("[COMMIT] tx %s is active with %d ops", txID, len(tx.Operations))
 
-	// Apply all operations atomically
+	// 3️⃣ Apply operations atomically
 	for i, op := range tx.Operations {
+		fmt.Printf("[COMMIT] applying op %d: %+v", i, op)
 		if err := tm.applyOperation(op); err != nil {
-			// If any operation fails, rollback the transaction
+			fmt.Printf("[COMMIT] FAILED op %d: %v — rolling back", i, err)
 			tm.rollbackTransactionUnsafe(tx)
 			return fmt.Errorf("failed to apply operation %d: %w", i, err)
 		}
+		fmt.Printf("[COMMIT] op %d applied successfully", i)
 	}
 
-	// Mark transaction as committed
+	// 4️⃣ Mark committed
 	tx.State = TransactionCommitted
 	tx.EndTime = time.Now()
+	fmt.Printf("[COMMIT] tx %s marked committed", txID)
 
-	// Skip WAL logging for now to avoid deadlocks
-	// TODO: Fix WAL deadlock issue
-
-	// Clean up transaction
+	// 5️⃣ Clean up safely
+	fmt.Printf("[COMMIT] locking tm.mu for cleanup")
+	tm.mu.Lock()
 	delete(tm.transactions, txID)
+	tm.mu.Unlock()
+	fmt.Printf("[COMMIT] tx %s removed from manager", txID)
 
+	fmt.Printf("[COMMIT] completed successfully for tx %s", txID)
 	return nil
 }
 
@@ -277,14 +295,32 @@ func (tm *TransactionManager) AddOperation(txID string, opType WALEntryType, tab
 		return fmt.Errorf("transaction %s is not active", txID)
 	}
 
-	operation := TransactionOperation{
+	// ✅ Normalize UPDATE payload so applyOperation gets the types it expects.
+	if opType == WAL_UPDATE {
+		if m, ok := data.(map[string]interface{}); ok {
+			// ensure row_index is float64
+			if ri, ok := m["row_index"].(int); ok {
+				m["row_index"] = float64(ri)
+			}
+			// ensure values is []interface{}
+			if vals, ok := m["values"].([]string); ok {
+				intfVals := make([]interface{}, len(vals))
+				for i, v := range vals {
+					intfVals[i] = v
+				}
+				m["values"] = intfVals
+			}
+			data = m
+		}
+	}
+
+	op := TransactionOperation{
 		Type:      opType,
 		TableName: tableName,
 		Data:      data,
 		Timestamp: time.Now(),
 	}
-
-	tx.Operations = append(tx.Operations, operation)
+	tx.Operations = append(tx.Operations, op)
 
 	return nil
 }

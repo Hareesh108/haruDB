@@ -261,14 +261,14 @@ func (e *Engine) Execute(input string) string {
 // handleBeginTransaction handles BEGIN TRANSACTION commands
 func (e *Engine) handleBeginTransaction(input string) string {
 	parts := strings.Fields(input)
-	
+
 	// Default isolation level
 	isolationLevel := storage.ReadCommitted
-	
+
 	// Parse isolation level if specified
 	if len(parts) >= 3 && strings.ToUpper(parts[1]) == "TRANSACTION" {
-		if len(parts) >= 6 && strings.ToUpper(parts[2]) == "ISOLATION" && 
-		   strings.ToUpper(parts[3]) == "LEVEL" {
+		if len(parts) >= 6 && strings.ToUpper(parts[2]) == "ISOLATION" &&
+			strings.ToUpper(parts[3]) == "LEVEL" {
 			switch strings.ToUpper(parts[4]) {
 			case "READ":
 				if len(parts) >= 6 && strings.ToUpper(parts[5]) == "UNCOMMITTED" {
@@ -287,18 +287,24 @@ func (e *Engine) handleBeginTransaction(input string) string {
 			}
 		}
 	}
-	
+
 	tx, err := e.DB.BeginTransaction(isolationLevel)
 	if err != nil {
 		return fmt.Sprintf("Failed to begin transaction: %v", err)
 	}
-	
+
 	return fmt.Sprintf("Transaction %s started with isolation level %d", tx.ID, isolationLevel)
 }
 
 // handleCommitTransaction handles COMMIT commands
 func (e *Engine) handleCommitTransaction() string {
+
+	fmt.Printf("Hello")
+
 	err := e.DB.CommitTransaction()
+
+	fmt.Printf("commit err = %#v", err)
+
 	if err != nil {
 		return fmt.Sprintf("Failed to commit transaction: %v", err)
 	}
@@ -308,10 +314,10 @@ func (e *Engine) handleCommitTransaction() string {
 // handleRollbackTransaction handles ROLLBACK commands
 func (e *Engine) handleRollbackTransaction(input string) string {
 	parts := strings.Fields(input)
-	
+
 	// Check for ROLLBACK TO SAVEPOINT
-	if len(parts) >= 4 && strings.ToUpper(parts[1]) == "TO" && 
-	   strings.ToUpper(parts[2]) == "SAVEPOINT" {
+	if len(parts) >= 4 && strings.ToUpper(parts[1]) == "TO" &&
+		strings.ToUpper(parts[2]) == "SAVEPOINT" {
 		savepointName := parts[3]
 		err := e.DB.RollbackToSavepoint(savepointName)
 		if err != nil {
@@ -319,7 +325,7 @@ func (e *Engine) handleRollbackTransaction(input string) string {
 		}
 		return fmt.Sprintf("Rolled back to savepoint %s", savepointName)
 	}
-	
+
 	// Regular rollback
 	err := e.DB.RollbackTransaction()
 	if err != nil {
@@ -334,7 +340,7 @@ func (e *Engine) handleSavepoint(input string) string {
 	if len(parts) < 2 {
 		return "Syntax error: SAVEPOINT name"
 	}
-	
+
 	savepointName := parts[1]
 	err := e.DB.CreateSavepoint(savepointName)
 	if err != nil {

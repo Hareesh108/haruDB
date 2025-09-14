@@ -592,6 +592,7 @@ func (db *Database) CommitTransaction() error {
 
 	txID := db.currentTransaction.ID
 	err := db.TransactionManager.CommitTransaction(txID)
+
 	if err == nil {
 		delete(db.activeTransactions, txID)
 		db.currentTransaction = nil
