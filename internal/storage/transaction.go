@@ -122,12 +122,16 @@ func (tm *TransactionManager) CommitTransaction(txID string) error {
 	}
 
 	// Apply all operations atomically
+	fmt.Printf("Committing transaction with %d operations\n", len(tx.Operations))
 	for i, op := range tx.Operations {
+		fmt.Printf("Operation %d: Type=%d, Table=%s, Data=%v\n", i, op.Type, op.TableName, op.Data)
 		if err := tm.applyOperation(op); err != nil {
 			// If any operation fails, rollback the transaction
+			fmt.Printf("Operation %d failed: %v\n", i, err)
 			tm.rollbackTransactionUnsafe(tx)
 			return fmt.Errorf("failed to apply operation %d: %w", i, err)
 		}
+		fmt.Printf("Operation %d completed successfully\n", i)
 	}
 
 	// Mark transaction as committed
