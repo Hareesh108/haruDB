@@ -28,6 +28,22 @@ func (e *Engine) Execute(input string) string {
 	upper := strings.ToUpper(input)
 
 	switch {
+	case strings.HasPrefix(upper, "BEGIN"):
+		// BEGIN TRANSACTION [ISOLATION LEVEL level]
+		return e.handleBeginTransaction(input)
+
+	case strings.HasPrefix(upper, "COMMIT"):
+		// COMMIT [TRANSACTION]
+		return e.handleCommitTransaction()
+
+	case strings.HasPrefix(upper, "ROLLBACK"):
+		// ROLLBACK [TRANSACTION] [TO SAVEPOINT name]
+		return e.handleRollbackTransaction(input)
+
+	case strings.HasPrefix(upper, "SAVEPOINT"):
+		// SAVEPOINT name
+		return e.handleSavepoint(input)
+
 	case strings.HasPrefix(upper, "CREATE INDEX"):
 		// CREATE INDEX ON users (email)
 		parts := strings.SplitN(input, "(", 2)
@@ -63,7 +79,7 @@ func (e *Engine) Execute(input string) string {
 		for i := range columns {
 			columns[i] = strings.TrimSpace(columns[i])
 		}
-		return e.DB.CreateTable(tableName, columns)
+		return e.DB.CreateTableTx(tableName, columns)
 
 	case strings.HasPrefix(upper, "INSERT INTO"):
 		// INSERT INTO users VALUES (1, 'Hareesh')
@@ -80,7 +96,7 @@ func (e *Engine) Execute(input string) string {
 			values[i] = strings.TrimSpace(values[i])
 			values[i] = strings.Trim(values[i], "'")
 		}
-		return e.DB.Insert(tableName, values)
+		return e.DB.InsertTx(tableName, values)
 
 	case strings.HasPrefix(upper, "SELECT * FROM"):
 		// SELECT * FROM users [WHERE conditions]
@@ -199,7 +215,7 @@ func (e *Engine) Execute(input string) string {
 			newRow[columnIndex] = value
 		}
 
-		return e.DB.Update(tableName, rowIndex, newRow)
+		return e.DB.UpdateTx(tableName, rowIndex, newRow)
 
 	case strings.HasPrefix(upper, "DELETE FROM"):
 		// DELETE FROM users ROW 0
@@ -224,7 +240,7 @@ func (e *Engine) Execute(input string) string {
 			return "Syntax error: missing ROW index"
 		}
 
-		return e.DB.Delete(tableName, rowIndex)
+		return e.DB.DeleteTx(tableName, rowIndex)
 
 	case strings.HasPrefix(upper, "DROP TABLE"):
 		// DROP TABLE users
@@ -233,9 +249,96 @@ func (e *Engine) Execute(input string) string {
 			return "Syntax error: DROP TABLE table_name"
 		}
 		tableName := strings.ToLower(parts[2])
-		return e.DB.DropTable(tableName)
+		return e.DB.DropTableTx(tableName)
 
 	default:
 		return "Unknown command"
 	}
+}
+
+// Transaction handler methods
+
+// handleBeginTransaction handles BEGIN TRANSACTION commands
+func (e *Engine) handleBeginTransaction(input string) string {
+	parts := strings.Fields(input)
+	
+	// Default isolation level
+	isolationLevel := storage.ReadCommitted
+	
+	// Parse isolation level if specified
+	if len(parts) >= 3 && strings.ToUpper(parts[1]) == "TRANSACTION" {
+		if len(parts) >= 6 && strings.ToUpper(parts[2]) == "ISOLATION" && 
+		   strings.ToUpper(parts[3]) == "LEVEL" {
+			switch strings.ToUpper(parts[4]) {
+			case "READ":
+				if len(parts) >= 6 && strings.ToUpper(parts[5]) == "UNCOMMITTED" {
+					isolationLevel = storage.ReadUncommitted
+				} else {
+					isolationLevel = storage.ReadCommitted
+				}
+			case "REPEATABLE":
+				if len(parts) >= 6 && strings.ToUpper(parts[5]) == "READ" {
+					isolationLevel = storage.RepeatableRead
+				}
+			case "SERIALIZABLE":
+				isolationLevel = storage.Serializable
+			default:
+				return "Invalid isolation level"
+			}
+		}
+	}
+	
+	tx, err := e.DB.BeginTransaction(isolationLevel)
+	if err != nil {
+		return fmt.Sprintf("Failed to begin transaction: %v", err)
+	}
+	
+	return fmt.Sprintf("Transaction %s started with isolation level %d", tx.ID, isolationLevel)
+}
+
+// handleCommitTransaction handles COMMIT commands
+func (e *Engine) handleCommitTransaction() string {
+	err := e.DB.CommitTransaction()
+	if err != nil {
+		return fmt.Sprintf("Failed to commit transaction: %v", err)
+	}
+	return "Transaction committed successfully"
+}
+
+// handleRollbackTransaction handles ROLLBACK commands
+func (e *Engine) handleRollbackTransaction(input string) string {
+	parts := strings.Fields(input)
+	
+	// Check for ROLLBACK TO SAVEPOINT
+	if len(parts) >= 4 && strings.ToUpper(parts[1]) == "TO" && 
+	   strings.ToUpper(parts[2]) == "SAVEPOINT" {
+		savepointName := parts[3]
+		err := e.DB.RollbackToSavepoint(savepointName)
+		if err != nil {
+			return fmt.Sprintf("Failed to rollback to savepoint %s: %v", savepointName, err)
+		}
+		return fmt.Sprintf("Rolled back to savepoint %s", savepointName)
+	}
+	
+	// Regular rollback
+	err := e.DB.RollbackTransaction()
+	if err != nil {
+		return fmt.Sprintf("Failed to rollback transaction: %v", err)
+	}
+	return "Transaction rolled back successfully"
+}
+
+// handleSavepoint handles SAVEPOINT commands
+func (e *Engine) handleSavepoint(input string) string {
+	parts := strings.Fields(input)
+	if len(parts) < 2 {
+		return "Syntax error: SAVEPOINT name"
+	}
+	
+	savepointName := parts[1]
+	err := e.DB.CreateSavepoint(savepointName)
+	if err != nil {
+		return fmt.Sprintf("Failed to create savepoint %s: %v", savepointName, err)
+	}
+	return fmt.Sprintf("Savepoint %s created", savepointName)
 }

@@ -23,9 +23,11 @@ type Table struct {
 }
 
 type Database struct {
-	DataDir string
-	Tables  map[string]*Table
-	WAL     *WALManager
+	DataDir           string
+	Tables            map[string]*Table
+	WAL               *WALManager
+	TransactionManager *TransactionManager
+	currentTransaction *Transaction
 }
 
 func NewDatabase(dataDir string) *Database {
@@ -41,6 +43,9 @@ func NewDatabase(dataDir string) *Database {
 		// If WAL initialization fails, continue without WAL (degraded mode)
 		fmt.Printf("Warning: Failed to initialize WAL: %v\n", err)
 	}
+
+	// Initialize Transaction Manager
+	db.TransactionManager = NewTransactionManager(db)
 
 	// Load any existing .harudb files first
 	_ = db.loadTables()
@@ -493,4 +498,194 @@ func (db *Database) applyIndexesOnInsert(table *Table, rowIndex int) {
 		}
 		table.Indexes[col][val] = append(table.Indexes[col][val], rowIndex)
 	}
+}
+
+// Transaction-aware methods
+
+// BeginTransaction starts a new transaction
+func (db *Database) BeginTransaction(isolationLevel IsolationLevel) (*Transaction, error) {
+	tx, err := db.TransactionManager.BeginTransaction(isolationLevel)
+	if err != nil {
+		return nil, err
+	}
+	db.currentTransaction = tx
+	return tx, nil
+}
+
+// CommitTransaction commits the current transaction
+func (db *Database) CommitTransaction() error {
+	if db.currentTransaction == nil {
+		return fmt.Errorf("no active transaction")
+	}
+	
+	txID := db.currentTransaction.ID
+	err := db.TransactionManager.CommitTransaction(txID)
+	if err == nil {
+		db.currentTransaction = nil
+	}
+	return err
+}
+
+// RollbackTransaction rolls back the current transaction
+func (db *Database) RollbackTransaction() error {
+	if db.currentTransaction == nil {
+		return fmt.Errorf("no active transaction")
+	}
+	
+	txID := db.currentTransaction.ID
+	err := db.TransactionManager.RollbackTransaction(txID)
+	if err == nil {
+		db.currentTransaction = nil
+	}
+	return err
+}
+
+// CreateSavepoint creates a savepoint in the current transaction
+func (db *Database) CreateSavepoint(name string) error {
+	if db.currentTransaction == nil {
+		return fmt.Errorf("no active transaction")
+	}
+	return db.TransactionManager.CreateSavepoint(db.currentTransaction.ID, name)
+}
+
+// RollbackToSavepoint rolls back to a savepoint in the current transaction
+func (db *Database) RollbackToSavepoint(name string) error {
+	if db.currentTransaction == nil {
+		return fmt.Errorf("no active transaction")
+	}
+	return db.TransactionManager.RollbackToSavepoint(db.currentTransaction.ID, name)
+}
+
+// GetCurrentTransaction returns the current active transaction
+func (db *Database) GetCurrentTransaction() *Transaction {
+	return db.currentTransaction
+}
+
+// Transaction-aware versions of existing methods
+
+// CreateTableTx creates a table within a transaction
+func (db *Database) CreateTableTx(name string, columns []string) string {
+	name = strings.ToLower(name)
+	if _, exists := db.Tables[name]; exists {
+		return fmt.Sprintf("Table %s already exists", name)
+	}
+
+	// If we're in a transaction, add operation to transaction
+	if db.currentTransaction != nil {
+		data := map[string]interface{}{
+			"columns": columns,
+		}
+		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_CREATE_TABLE, name, data); err != nil {
+			return fmt.Sprintf("Failed to add operation to transaction: %v", err)
+		}
+		return fmt.Sprintf("Table %s creation queued in transaction", name)
+	}
+
+	// Original non-transactional behavior
+	return db.CreateTable(name, columns)
+}
+
+// InsertTx inserts a row within a transaction
+func (db *Database) InsertTx(tableName string, values []string) string {
+	tableName = strings.ToLower(tableName)
+	table, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+	if len(values) != len(table.Columns) {
+		return "Column count does not match"
+	}
+
+	// If we're in a transaction, add operation to transaction
+	if db.currentTransaction != nil {
+		data := map[string]interface{}{
+			"values": values,
+		}
+		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_INSERT, tableName, data); err != nil {
+			return fmt.Sprintf("Failed to add operation to transaction: %v", err)
+		}
+		return "1 row insert queued in transaction"
+	}
+
+	// Original non-transactional behavior
+	return db.Insert(tableName, values)
+}
+
+// UpdateTx updates a row within a transaction
+func (db *Database) UpdateTx(tableName string, rowIndex int, values []string) string {
+	tableName = strings.ToLower(tableName)
+	table, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+
+	if rowIndex < 0 || rowIndex >= len(table.Rows) {
+		return "Row index out of bounds"
+	}
+
+	if len(values) != len(table.Columns) {
+		return "Column count does not match"
+	}
+
+	// If we're in a transaction, add operation to transaction
+	if db.currentTransaction != nil {
+		data := map[string]interface{}{
+			"row_index": rowIndex,
+			"values":    values,
+		}
+		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_UPDATE, tableName, data); err != nil {
+			return fmt.Sprintf("Failed to add operation to transaction: %v", err)
+		}
+		return "1 row update queued in transaction"
+	}
+
+	// Original non-transactional behavior
+	return db.Update(tableName, rowIndex, values)
+}
+
+// DeleteTx deletes a row within a transaction
+func (db *Database) DeleteTx(tableName string, rowIndex int) string {
+	tableName = strings.ToLower(tableName)
+	table, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+
+	if rowIndex < 0 || rowIndex >= len(table.Rows) {
+		return "Row index out of bounds"
+	}
+
+	// If we're in a transaction, add operation to transaction
+	if db.currentTransaction != nil {
+		data := map[string]interface{}{
+			"row_index": rowIndex,
+		}
+		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_DELETE, tableName, data); err != nil {
+			return fmt.Sprintf("Failed to add operation to transaction: %v", err)
+		}
+		return "1 row delete queued in transaction"
+	}
+
+	// Original non-transactional behavior
+	return db.Delete(tableName, rowIndex)
+}
+
+// DropTableTx drops a table within a transaction
+func (db *Database) DropTableTx(tableName string) string {
+	tableName = strings.ToLower(tableName)
+	_, exists := db.Tables[tableName]
+	if !exists {
+		return fmt.Sprintf(ErrTableNotFound, tableName)
+	}
+
+	// If we're in a transaction, add operation to transaction
+	if db.currentTransaction != nil {
+		if err := db.TransactionManager.AddOperation(db.currentTransaction.ID, WAL_DROP_TABLE, tableName, nil); err != nil {
+			return fmt.Sprintf("Failed to add operation to transaction: %v", err)
+		}
+		return fmt.Sprintf("Table %s drop queued in transaction", tableName)
+	}
+
+	// Original non-transactional behavior
+	return db.DropTable(tableName)
 }

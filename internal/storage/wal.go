@@ -22,6 +22,11 @@ const (
 	WAL_DELETE
 	WAL_DROP_TABLE
 	WAL_CHECKPOINT
+	WAL_BEGIN_TRANSACTION
+	WAL_COMMIT_TRANSACTION
+	WAL_ROLLBACK_TRANSACTION
+	WAL_SAVEPOINT
+	WAL_ROLLBACK_TO_SAVEPOINT
 )
 
 // WALEntry represents a single entry in the WAL
@@ -289,6 +294,26 @@ func (wm *WALManager) replayEntry(db *Database, entry *WALEntry) error {
 	case WAL_CHECKPOINT:
 		// Update checkpoint time
 		wm.checkpoint = entry.Timestamp
+
+	case WAL_BEGIN_TRANSACTION:
+		// Transaction begin - just log, no action needed during replay
+		// Transactions are handled by the TransactionManager
+
+	case WAL_COMMIT_TRANSACTION:
+		// Transaction commit - just log, no action needed during replay
+		// Transactions are handled by the TransactionManager
+
+	case WAL_ROLLBACK_TRANSACTION:
+		// Transaction rollback - just log, no action needed during replay
+		// Transactions are handled by the TransactionManager
+
+	case WAL_SAVEPOINT:
+		// Savepoint creation - just log, no action needed during replay
+		// Savepoints are handled by the TransactionManager
+
+	case WAL_ROLLBACK_TO_SAVEPOINT:
+		// Rollback to savepoint - just log, no action needed during replay
+		// Savepoints are handled by the TransactionManager
 	}
 
 	return nil

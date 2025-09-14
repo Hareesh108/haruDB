@@ -32,6 +32,17 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 - `SELECT ... WHERE <column> = 'value'` - Equality filters use indexes when available
 - Index metadata persisted; indexes are rebuilt on startup
 
+### 🔒 **Transactions & ACID Compliance**
+
+- **ACID Transactions** - Full atomicity, consistency, isolation, and durability
+- `BEGIN TRANSACTION` - Start a new transaction with configurable isolation levels
+- `COMMIT` - Commit all changes in the current transaction
+- `ROLLBACK` - Rollback all changes in the current transaction
+- `SAVEPOINT name` - Create savepoints within transactions
+- `ROLLBACK TO SAVEPOINT name` - Rollback to specific savepoints
+- **Isolation Levels** - READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SERIALIZABLE
+- **WAL Integration** - All transaction operations logged for crash recovery
+
 ### 🔒 **Data Integrity & Recovery**
 
 - **Write-Ahead Logging (WAL)** ensures all changes are logged before being applied
@@ -157,6 +168,28 @@ Table users dropped
 
 haruDB> SELECT * FROM users;
 Table users not found
+```
+
+### 🔒 **Transaction Example**
+
+```sql
+-- Create accounts table
+CREATE TABLE accounts (id, name, balance);
+INSERT INTO accounts VALUES (1, 'Alice', '1000');
+INSERT INTO accounts VALUES (2, 'Bob', '500');
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Transfer money
+UPDATE accounts SET balance = '900' ROW 0;  -- Alice: 1000 -> 900
+UPDATE accounts SET balance = '600' ROW 1;  -- Bob: 500 -> 600
+
+-- Commit transaction
+COMMIT;
+
+-- Verify changes
+SELECT * FROM accounts;
 ```
 
 ---
