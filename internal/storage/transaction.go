@@ -295,23 +295,21 @@ func (tm *TransactionManager) AddOperation(txID string, opType WALEntryType, tab
 		return fmt.Errorf("transaction %s is not active", txID)
 	}
 
-	// ✅ Normalize UPDATE payload so applyOperation gets the types it expects.
-	if opType == WAL_UPDATE {
-		if m, ok := data.(map[string]interface{}); ok {
-			// ensure row_index is float64
-			if ri, ok := m["row_index"].(int); ok {
-				m["row_index"] = float64(ri)
+	// ✅ Normalize row data for all write operations
+	if m, ok := data.(map[string]interface{}); ok {
+		// convert []string -> []interface{} for "values"
+		if vals, ok := m["values"].([]string); ok {
+			intfVals := make([]interface{}, len(vals))
+			for i, v := range vals {
+				intfVals[i] = v
 			}
-			// ensure values is []interface{}
-			if vals, ok := m["values"].([]string); ok {
-				intfVals := make([]interface{}, len(vals))
-				for i, v := range vals {
-					intfVals[i] = v
-				}
-				m["values"] = intfVals
-			}
-			data = m
+			m["values"] = intfVals
 		}
+		// convert int -> float64 for "row_index" if present
+		if ri, ok := m["row_index"].(int); ok {
+			m["row_index"] = float64(ri)
+		}
+		data = m
 	}
 
 	op := TransactionOperation{

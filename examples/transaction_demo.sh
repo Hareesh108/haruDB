@@ -143,7 +143,7 @@ INSERT INTO logs VALUES (3, '2024-01-01', 'Log entry 3');
 INSERT INTO logs VALUES (4, '2024-01-01', 'Log entry 4');
 INSERT INTO logs VALUES (5, '2024-01-01', 'Log entry 5');
 COMMIT;
-SELECT COUNT(*) FROM logs;
+SELECT * FROM logs;
 "
 
 echo "📊 Example 9: Transaction Cleanup"
