@@ -23,17 +23,19 @@ type Table struct {
 }
 
 type Database struct {
-	DataDir           string
-	Tables            map[string]*Table
-	WAL               *WALManager
+	DataDir            string
+	Tables             map[string]*Table
+	WAL                *WALManager
 	TransactionManager *TransactionManager
 	currentTransaction *Transaction
+	activeTransactions map[string]*Transaction
 }
 
 func NewDatabase(dataDir string) *Database {
 	db := &Database{
-		DataDir: dataDir,
-		Tables:  make(map[string]*Table),
+		DataDir:            dataDir,
+		Tables:             make(map[string]*Table),
+		activeTransactions: make(map[string]*Transaction),
 	}
 
 	// Initialize WAL manager
@@ -508,6 +510,7 @@ func (db *Database) BeginTransaction(isolationLevel IsolationLevel) (*Transactio
 	if err != nil {
 		return nil, err
 	}
+	db.activeTransactions[tx.ID] = tx
 	db.currentTransaction = tx
 	return tx, nil
 }
@@ -517,10 +520,11 @@ func (db *Database) CommitTransaction() error {
 	if db.currentTransaction == nil {
 		return fmt.Errorf("no active transaction")
 	}
-	
+
 	txID := db.currentTransaction.ID
 	err := db.TransactionManager.CommitTransaction(txID)
 	if err == nil {
+		delete(db.activeTransactions, txID)
 		db.currentTransaction = nil
 	}
 	return err
@@ -531,10 +535,11 @@ func (db *Database) RollbackTransaction() error {
 	if db.currentTransaction == nil {
 		return fmt.Errorf("no active transaction")
 	}
-	
+
 	txID := db.currentTransaction.ID
 	err := db.TransactionManager.RollbackTransaction(txID)
 	if err == nil {
+		delete(db.activeTransactions, txID)
 		db.currentTransaction = nil
 	}
 	return err
