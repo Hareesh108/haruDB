@@ -381,6 +381,42 @@ Key capabilities—illustrated by the commands in your script:
 
 ---
 
+### **4. End-to-End Example (Transactions)**
+
+```sql
+CREATE TABLE accounts (id, name, balance);
+INSERT INTO accounts VALUES (1, 'Alice', '1000');
+INSERT INTO accounts VALUES (2, 'Bob', '500');
+SELECT * FROM accounts;
+
+BEGIN TRANSACTION;
+UPDATE accounts SET balance = '95500' ROW 0;
+UPDATE accounts SET balance = '69900' ROW 1;
+SELECT * FROM accounts;
+COMMIT;
+SELECT * FROM accounts;
+
+BEGIN TRANSACTION;
+UPDATE accounts SET balance = '800' ROW 0;
+UPDATE accounts SET balance = '700' ROW 1;
+SELECT * FROM accounts;
+ROLLBACK;
+SELECT * FROM accounts;
+
+BEGIN TRANSACTION;
+INSERT INTO accounts VALUES (3, 'Charlie', '200');
+SAVEPOINT sp1;
+INSERT INTO accounts VALUES (4, 'David', '300');
+SAVEPOINT sp2;
+INSERT INTO accounts VALUES (5, 'Eve', '400');
+SELECT * FROM accounts;
+ROLLBACK TO SAVEPOINT sp1;
+SELECT * FROM accounts;
+COMMIT;
+SELECT * FROM accounts;
+
+```
+
 ## Advanced Transaction Features
 
 HaruDB can now handle **full-fledged transactional operations** with ACID compliance, covering a wide range of scenarios from simple inserts to complex multi-table workflows.
