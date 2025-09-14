@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Hareesh108/haruDB/internal/parser"
 )
@@ -67,7 +68,21 @@ func handleConnection(conn net.Conn, engine *parser.Engine) {
 			break
 		}
 
-		result := engine.Execute(input)
+		// Execute with timeout to prevent hanging
+		resultChan := make(chan string, 1)
+		go func() {
+			result := engine.Execute(input)
+			resultChan <- result
+		}()
+
+		var result string
+		select {
+		case result = <-resultChan:
+			// Command completed successfully
+		case <-time.After(10 * time.Second):
+			// Command timed out
+			result = "Error: Command timed out after 10 seconds"
+		}
 
 		if !strings.HasSuffix(result, "\n") {
 			result += "\n"

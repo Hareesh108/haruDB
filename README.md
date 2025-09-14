@@ -32,6 +32,76 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 - `SELECT ... WHERE <column> = 'value'` - Equality filters use indexes when available
 - Index metadata persisted; indexes are rebuilt on startup
 
+### 🔒 **Transactions & ACID Compliance**
+
+- **ACID Transactions** – Full atomicity, consistency, isolation, and durability demonstrated in HaruDB.
+- `BEGIN TRANSACTION` – Start a new transaction:
+
+  ```sql
+  BEGIN TRANSACTION;
+  ```
+
+- `COMMIT` – Commit all changes in the current transaction:
+
+  ```sql
+  COMMIT;
+  ```
+
+- `ROLLBACK` – Rollback all changes in the current transaction:
+
+  ```sql
+  ROLLBACK;
+  ```
+
+- `SAVEPOINT name` – Create savepoints within transactions:
+
+  ```sql
+  SAVEPOINT sp1;
+  ```
+
+- `ROLLBACK TO SAVEPOINT name` – Rollback to a specific savepoint:
+
+  ```sql
+  ROLLBACK TO SAVEPOINT sp1;
+  ```
+
+- **Isolation Levels** – Control how transactions interact:
+
+  ```sql
+  BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+  BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+  BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+  ```
+
+- **Multi-table Operations** – Transactions spanning multiple tables:
+
+  ```sql
+  INSERT INTO orders VALUES (1, 1, 'Laptop', '1', '999.99');
+  UPDATE inventory SET stock = '9' ROW 0;
+  COMMIT;
+  ```
+
+- **Error Handling in Transactions** – Safely handle invalid operations:
+
+  ```sql
+  BEGIN TRANSACTION;
+  UPDATE inventory SET stock = '5' ROW 10; -- invalid row
+  ROLLBACK;
+  ```
+
+- **Large Transaction Performance** – Efficiently handle bulk inserts:
+
+  ```sql
+  BEGIN TRANSACTION;
+  INSERT INTO logs VALUES (1, '2024-01-01', 'Log entry 1');
+  INSERT INTO logs VALUES (2, '2024-01-01', 'Log entry 2');
+  COMMIT;
+  ```
+
+- **WAL Integration** – All transaction operations logged for crash recovery.
+
+---
+
 ### 🔒 **Data Integrity & Recovery**
 
 - **Write-Ahead Logging (WAL)** ensures all changes are logged before being applied
@@ -51,7 +121,7 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 | Basic SQL operations (CRUD)      | ✅ **Implemented** |
 | Indexes & query optimization     | ✅ **Implemented** |
 | Advanced WHERE clauses           | ✅ **Implemented**    |
-| Transactions & ACID compliance  | 🔜 Planned    |
+| Transactions & ACID compliance  `| ✅ **Implemented**    |
 | Concurrency & locking            | 🔜 Planned    |
 | Custom wire protocol             | 🔜 Planned    |
 | CLI client (`haru-cli`)          | ✅ **Implemented** |
@@ -157,6 +227,28 @@ Table users dropped
 
 haruDB> SELECT * FROM users;
 Table users not found
+```
+
+### 🔒 **Transaction Example**
+
+```sql
+-- Create accounts table
+CREATE TABLE accounts (id, name, balance);
+INSERT INTO accounts VALUES (1, 'Alice', '1000');
+INSERT INTO accounts VALUES (2, 'Bob', '500');
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Transfer money
+UPDATE accounts SET balance = '900' ROW 0;  -- Alice: 1000 -> 900
+UPDATE accounts SET balance = '600' ROW 1;  -- Bob: 500 -> 600
+
+-- Commit transaction
+COMMIT;
+
+-- Verify changes
+SELECT * FROM accounts;
 ```
 
 ---
@@ -286,6 +378,26 @@ Key capabilities—illustrated by the commands in your script:
 | **Logical operators**    | `SELECT * FROM employees WHERE age > 25 AND department = 'Engineering';`                   | Combine multiple conditions with `AND`, `OR`, and parentheses for grouping.                     |
 | **Complex combinations** | `SELECT * FROM employees WHERE department = 'Engineering' AND (age > 30 OR salary > 60000);` | Mix nested logic for precise filtering.                                                         |
 | **Edge cases**           | `SELECT * FROM employees WHERE age > 100;`                                                 | Returns empty sets gracefully, supports lexicographic string
+
+---
+
+## Advanced Transaction Features
+
+HaruDB can now handle **full-fledged transactional operations** with ACID compliance, covering a wide range of scenarios from simple inserts to complex multi-table workflows.
+Key capabilities—illustrated by the commands in your script:
+
+| Capability                         | Example from your script                                                                                               | What it means                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Basic transaction workflow**     | `CREATE TABLE accounts (id, name, balance); INSERT INTO accounts VALUES (1, 'Alice', '1000'); SELECT * FROM accounts;` | Create tables, insert rows, and query data within a transactional context.                        |
+| **Begin/Commit/Rollback**          | `BEGIN TRANSACTION; UPDATE accounts SET balance = '900' ROW 0; COMMIT;`                                                | Start a transaction, apply multiple operations, and commit to make changes permanent.             |
+| **Transaction rollback**           | `BEGIN TRANSACTION; UPDATE accounts SET balance = '800' ROW 0; ROLLBACK;`                                              | Undo all operations within a transaction to maintain consistency.                                 |
+| **Savepoints**                     | `SAVEPOINT sp1; INSERT INTO accounts VALUES (4, 'David', '300'); ROLLBACK TO SAVEPOINT sp1;`                           | Create intermediate checkpoints to selectively undo operations without rolling back everything.   |
+| **Isolation levels**               | `BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE; SELECT * FROM accounts; COMMIT;`                                      | Control how concurrent transactions interact (Read Committed, Repeatable Read, Serializable).     |
+| **Complex multi-table operations** | `BEGIN TRANSACTION; INSERT INTO orders VALUES (...); UPDATE inventory SET stock = '9' ROW 0; COMMIT;`                  | Support transactions spanning multiple tables with dependent operations.                          |
+| **Error handling**                 | `BEGIN TRANSACTION; UPDATE inventory SET stock = '5' ROW 10; ROLLBACK;`                                                | Gracefully handle errors by rolling back failed transactions.                                     |
+| **Large transaction performance**  | `BEGIN TRANSACTION; INSERT INTO logs VALUES (...); COMMIT;`                                                            | Efficiently handle bulk inserts or updates in a single transaction.                               |
+| **ACID compliance demonstration**  | `-- Atomicity, Consistency, Isolation, Durability`                                                                     | Demonstrates that all transactional properties are supported, ensuring reliability and integrity. |
+| **Cleanup & teardown**             | `BEGIN TRANSACTION; DROP TABLE accounts; COMMIT;`                                                                      | Safely remove tables and data at the end of a session.                                            |
 
 ---
 
