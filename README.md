@@ -264,7 +264,7 @@ SELECT * FROM accounts;
 | **Memory-First** | ✅ | ❌ | ❌ |
 | **Go Native** | ✅ | ❌ | ❌ |
 | **Docker Ready** | ✅ | ✅ | ✅ |
-| **ACID Transactions** | 🔜 | ✅ | ✅ |
+| **ACID Transactions** | ✅ | ✅ | ✅ |
 | **Advanced Indexing** | ✅ | ✅ | ✅ |
 | **Concurrent Access** | 🔜 | Limited | ✅ |
 
