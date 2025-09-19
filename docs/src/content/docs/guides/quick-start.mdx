@@ -1,0 +1,51 @@
+---
+title: Quick Start
+description: Start the HaruDB server and run your first queries in minutes.
+---
+
+## Start the Server
+
+```bash
+# Using the binary
+./harudb --data-dir ./data
+
+# Or using Docker
+docker run -p 54321:54321 hareesh108/harudb:latest
+```
+
+## Connect
+
+```bash
+# Telnet
+telnet localhost 54321
+
+# Or netcat
+nc localhost 54321
+```
+
+## Basic Operations
+
+```sql
+-- Create a table
+CREATE TABLE products (id, name, price);
+
+-- Insert data
+INSERT INTO products VALUES (1, 'Laptop', '999.99');
+INSERT INTO products VALUES (2, 'Mouse', '29.99');
+
+-- Query data
+SELECT * FROM products;
+
+-- Create an index and run indexed queries
+CREATE INDEX ON products (name);
+SELECT * FROM products WHERE name = 'Laptop';
+
+-- Update data
+UPDATE products SET price = '1099.99' ROW 0;
+
+-- Delete data
+DELETE FROM products ROW 1;
+
+-- Drop table
+DROP TABLE products;
+```

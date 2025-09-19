@@ -1,0 +1,10 @@
+---
+title: Write-Ahead Logging (WAL)
+description: HaruDB’s WAL design for durability and recovery.
+---
+
+- Binary WAL format with timestamps and operation metadata.
+- All changes logged before being applied to data files.
+- Automatic WAL replay on startup.
+- Periodic checkpointing marks successful persistence.
+- Thread-safe with mutex protection.

@@ -1,0 +1,27 @@
+---
+title: Troubleshooting
+description: Fix common issues when running HaruDB.
+---
+
+## Port already in use
+
+```bash
+# Kill existing process
+pkill harudb
+# Or use a different port
+./harudb --port 54322
+```
+
+## WAL file corruption
+
+```bash
+# Remove WAL file to start fresh (data loss warning!)
+rm data/wal.log
+```
+
+## Permission issues
+
+```bash
+chmod +x harudb
+chmod 755 data/
+```

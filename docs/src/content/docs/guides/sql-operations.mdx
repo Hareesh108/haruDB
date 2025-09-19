@@ -1,0 +1,27 @@
+---
+title: SQL Operations
+description: Supported DDL and DML commands in HaruDB.
+---
+
+## DDL
+
+- `CREATE TABLE` — Create tables with custom schemas
+- `DROP TABLE` — Remove tables and associated data
+
+## DML
+
+- `INSERT` — Add new rows to tables
+- `SELECT` — Query and display table data
+- `UPDATE` — Modify existing rows by index
+- `DELETE` — Remove rows by index
+
+### Examples
+
+```sql
+CREATE TABLE users (id, name, email);
+INSERT INTO users VALUES (1, 'Hareesh', 'hareesh@example.com');
+SELECT * FROM users;
+UPDATE users SET name = 'Hareesh Updated' ROW 0;
+DELETE FROM users ROW 0;
+DROP TABLE users;
+```

@@ -1,0 +1,34 @@
+---
+title: Connect
+description: Connect to HaruDB using Telnet or the CLI client.
+---
+
+## Telnet
+
+```bash
+telnet localhost 54321
+```
+
+## Haru CLI
+
+```bash
+haru-cli
+```
+
+### Example session
+
+```
+Welcome to HaruDB v0.0.4 🎉
+Type 'exit' to quit.
+
+haruDB>
+haruDB> CREATE TABLE users (id, name, email);
+Table users created
+
+haruDB> INSERT INTO users VALUES (1, 'Hareesh', 'hareesh@example.com');
+1 row inserted
+
+haruDB> SELECT * FROM users;
+id | name    | email
+1  | Hareesh | hareesh@example.com
+```

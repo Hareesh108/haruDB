@@ -1,0 +1,38 @@
+---
+title: Transactions & ACID
+description: Use BEGIN, COMMIT, ROLLBACK, savepoints, and isolation levels.
+---
+
+HaruDB supports ACID transactions with WAL integration.
+
+## Basics
+
+```sql
+BEGIN TRANSACTION;
+COMMIT;
+ROLLBACK;
+```
+
+## Savepoints
+
+```sql
+SAVEPOINT sp1;
+ROLLBACK TO SAVEPOINT sp1;
+```
+
+## Isolation Levels
+
+```sql
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+```
+
+## Example
+
+```sql
+BEGIN TRANSACTION;
+INSERT INTO orders VALUES (1, 1, 'Laptop', '1', '999.99');
+UPDATE inventory SET stock = '9' ROW 0;
+COMMIT;
+```

@@ -1,0 +1,15 @@
+---
+title: Indexes & Optimization
+description: Create indexes and run indexed queries for faster lookups.
+---
+
+- `CREATE INDEX ON <table> (<column>)` — Build an in-memory hash index.
+- Equality filters use indexes when available: `SELECT ... WHERE <column> = 'value'`.
+- Index metadata is persisted; indexes are rebuilt on startup.
+
+```sql
+CREATE TABLE users (id, name, email);
+CREATE INDEX ON users (email);
+SELECT * FROM users WHERE email = 'alice@example.com';
+```
+

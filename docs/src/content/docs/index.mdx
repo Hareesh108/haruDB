@@ -1,36 +1,44 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
+title: HaruDB
+description: A modern, client-server database in Go with WAL, ACID transactions, indexes, and JSON-backed persistence.
 template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
+  tagline: Modern, crash-safe, SQL-like database built from scratch in Go.
   image:
     file: ../../assets/houston.webp
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Quick Start
+      link: /guides/quick-start/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
+    - text: Install
+      link: /guides/installation/
+      icon: right-arrow
+    - text: Docker
+      link: /guides/docker/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/Hareesh108/haruDB
       icon: external
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+## What is HaruDB?
+
+HaruDB is a modern, fully custom database built from scratch in Go, inspired by PostgreSQL and SQLite. It provides a TCP-based client–server architecture, an interactive REPL, Write-Ahead Logging (WAL) for crash recovery, ACID transactions, indexes for fast queries, and persistent JSON-backed storage.
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="Get Started" icon="pencil">
+		Follow the <a href="/guides/quick-start/">Quick Start</a> to run the server and connect.
 	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
+	<Card title="Features" icon="sparkles">
+		Explore <a href="/guides/sql-operations/">SQL operations</a>, <a href="/guides/indexes/">Indexes</a>, and <a href="/guides/transactions/">Transactions</a>.
 	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
+	<Card title="Architecture" icon="bricks">
+		Learn about <a href="/reference/wal/">WAL</a>, <a href="/reference/storage/">Storage Engine</a>, and the <a href="/reference/sql-parser/">SQL Parser</a>.
 	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
+	<Card title="Roadmap" icon="map">
+		See <a href="/reference/roadmap/">Planned Features</a> and the project vision.
 	</Card>
 </CardGrid>
