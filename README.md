@@ -9,7 +9,7 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 
 ### 🏗️ **Core Architecture**
 
-- **TCP-based client-server** architecture with interactive REPL (like `psql`)
+- **TCP-based client-server** architecture with interactive 
 - **Write-Ahead Logging (WAL)** for crash recovery and data durability
 - **Atomic operations** with proper error handling and rollback
 - **Persistent storage** with JSON-based table files
