@@ -71,9 +71,9 @@ func (tm *TLSManager) generateSelfSignedCert() error {
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
 			Organization:  []string{"HaruDB"},
-			Country:       []string{"US"},
+			Country:       []string{"IN"},
 			Province:      []string{""},
-			Locality:      []string{"San Francisco"},
+			Locality:      []string{"Pune"},
 			StreetAddress: []string{""},
 			PostalCode:    []string{""},
 		},
