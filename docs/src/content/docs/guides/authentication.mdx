@@ -1,0 +1,398 @@
+---
+title: Authentication & User Management
+description: Complete guide to user authentication, role-based access control, and security features in HaruDB.
+---
+
+## Overview
+
+HaruDB provides comprehensive authentication and user management features including:
+
+- **User Management**: Create, delete, and manage database users
+- **Role-based Access Control**: Admin, User, and ReadOnly roles
+- **Session Management**: Secure session handling with automatic cleanup
+- **TLS Encryption**: Optional TLS support for secure connections
+- **Password Security**: SHA-256 password hashing
+
+## User Roles
+
+HaruDB supports three distinct user roles with different permission levels:
+
+### Admin Role
+- **Full database access**: Can perform all operations
+- **User management**: Create, delete, and modify users
+- **Backup and restore**: Access to backup and restore operations
+- **System administration**: Full control over database settings
+
+### User Role
+- **Standard database operations**: Create tables, insert, update, delete data
+- **Transaction management**: Full transaction support
+- **Query operations**: All SELECT operations and WHERE clauses
+- **Index management**: Create and use indexes
+
+### ReadOnly Role
+- **Read-only access**: Can only perform SELECT operations
+- **No modifications**: Cannot insert, update, or delete data
+- **No schema changes**: Cannot create or drop tables
+- **Limited transactions**: Can only read data within transactions
+
+## User Management Commands
+
+### LOGIN
+
+Authenticate with existing user credentials.
+
+```sql
+-- Login with username and password
+LOGIN username password
+
+-- Example
+LOGIN admin admin123
+LOGIN john mypassword
+LOGIN readonly readpass
+```
+
+**Notes:**
+- Default admin user: `admin` / `admin123`
+- Passwords are case-sensitive
+- Sessions are automatically managed
+
+### LOGOUT
+
+End the current user session.
+
+```sql
+LOGOUT
+```
+
+### CREATE USER
+
+Create a new database user with specified role.
+
+```sql
+-- Create user with standard role
+CREATE USER username password USER
+
+-- Create user with admin role
+CREATE USER username password ADMIN
+
+-- Create user with readonly role
+CREATE USER username password READONLY
+
+-- Examples
+CREATE USER john mypassword USER
+CREATE USER jane herpassword ADMIN
+CREATE USER readonly readpass READONLY
+```
+
+**Notes:**
+- Only admin users can create new users
+- Usernames must be unique
+- Passwords are hashed using SHA-256
+
+### DELETE USER
+
+Remove a user from the database.
+
+```sql
+-- Delete user
+DELETE USER username
+
+-- Example
+DELETE USER john
+```
+
+**Notes:**
+- Only admin users can delete users
+- Cannot delete the current logged-in user
+- Cannot delete the default admin user
+
+### LIST USERS
+
+Display all users in the database (admin only).
+
+```sql
+LIST USERS
+```
+
+**Output example:**
+```
+Users:
+- admin (ADMIN)
+- john (USER)
+- jane (ADMIN)
+- readonly (READONLY)
+```
+
+## Complete Authentication Example
+
+```sql
+-- Login as default admin
+LOGIN admin admin123
+
+-- Create different types of users
+CREATE USER alice alicepass USER
+CREATE USER bob bobpass ADMIN
+CREATE USER viewer viewpass READONLY
+
+-- List all users
+LIST USERS
+
+-- Logout and login as different user
+LOGOUT
+LOGIN alice alicepass
+
+-- Try to create user (will fail - not admin)
+CREATE USER test testpass USER
+-- Error: Insufficient permissions
+
+-- Logout and login as admin
+LOGOUT
+LOGIN bob bobpass
+
+-- Create another user
+CREATE USER charlie charliepass USER
+
+-- List users again
+LIST USERS
+
+-- Delete a user
+DELETE USER alice
+
+-- Final user list
+LIST USERS
+```
+
+## Role-Based Access Control Examples
+
+### Admin User Operations
+
+```sql
+-- Login as admin
+LOGIN admin admin123
+
+-- Full database operations
+CREATE TABLE users (id, name, email);
+INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');
+SELECT * FROM users;
+
+-- User management
+CREATE USER john johnpass USER
+LIST USERS
+
+-- Backup operations
+BACKUP TO ./backup.db DESCRIPTION "Admin backup"
+
+-- All operations allowed
+UPDATE users SET name = 'Alice Updated' ROW 0;
+DELETE FROM users ROW 0;
+DROP TABLE users;
+```
+
+### Standard User Operations
+
+```sql
+-- Login as standard user
+LOGIN john johnpass
+
+-- Standard database operations
+CREATE TABLE products (id, name, price);
+INSERT INTO products VALUES (1, 'Laptop', '999.99');
+SELECT * FROM products;
+
+-- Transaction operations
+BEGIN TRANSACTION;
+INSERT INTO products VALUES (2, 'Mouse', '29.99');
+COMMIT;
+
+-- Index operations
+CREATE INDEX ON products (name);
+SELECT * FROM products WHERE name = 'Laptop';
+
+-- Update and delete operations
+UPDATE products SET price = '1099.99' ROW 0;
+DELETE FROM products ROW 1;
+
+-- These operations will fail (not admin)
+CREATE USER test testpass USER
+-- Error: Insufficient permissions
+
+LIST USERS
+-- Error: Insufficient permissions
+```
+
+### ReadOnly User Operations
+
+```sql
+-- Login as readonly user
+LOGIN viewer viewpass
+
+-- Read operations only
+SELECT * FROM products;
+SELECT * FROM products WHERE price > 100;
+SELECT COUNT(*) FROM products;
+
+-- Transaction for read consistency
+BEGIN TRANSACTION;
+SELECT * FROM products;
+SELECT * FROM products WHERE name = 'Laptop';
+COMMIT;
+
+-- These operations will fail (readonly)
+INSERT INTO products VALUES (3, 'Keyboard', '79.99');
+-- Error: Insufficient permissions
+
+UPDATE products SET price = '1199.99' ROW 0;
+-- Error: Insufficient permissions
+
+CREATE TABLE orders (id, product_id, quantity);
+-- Error: Insufficient permissions
+```
+
+## TLS Encryption
+
+HaruDB supports TLS encryption for secure connections.
+
+### Server Configuration
+
+```bash
+# Start server with TLS
+./harudb --data-dir ./data --tls
+
+# Start server with custom TLS settings
+./harudb --data-dir ./data --tls --tls-cert ./cert.pem --tls-key ./key.pem
+```
+
+### Client Connection
+
+```bash
+# Connect with TLS
+haru-cli --tls
+
+# Connect to remote server with TLS
+haru-cli --host remote-server.com --port 54321 --tls
+```
+
+## Session Management
+
+### Automatic Session Cleanup
+
+HaruDB automatically manages user sessions:
+
+- **Session timeout**: Inactive sessions are automatically closed
+- **Connection limits**: Maximum concurrent connections per user
+- **Cleanup on disconnect**: Sessions are properly cleaned up
+
+### Session Information
+
+```sql
+-- Check current user (if supported)
+SELECT CURRENT_USER();
+
+-- Check session status
+SELECT SESSION_ID();
+```
+
+## Security Best Practices
+
+### Password Security
+
+1. **Use strong passwords**: Minimum 8 characters with mixed case, numbers, and symbols
+2. **Regular password updates**: Change passwords periodically
+3. **Avoid default passwords**: Never use default admin password in production
+
+### User Management
+
+1. **Principle of least privilege**: Assign minimum required permissions
+2. **Regular user audits**: Review and clean up unused accounts
+3. **Role separation**: Use different roles for different purposes
+
+### Network Security
+
+1. **Use TLS encryption**: Always use TLS in production environments
+2. **Firewall configuration**: Restrict database access to trusted networks
+3. **Regular updates**: Keep HaruDB updated with latest security patches
+
+## Common Authentication Patterns
+
+### Application User Pattern
+
+```sql
+-- Create application-specific users
+CREATE USER app_user apppass USER
+CREATE USER app_readonly appreadpass READONLY
+
+-- Application connects with app_user for writes
+LOGIN app_user apppass
+-- Perform write operations
+
+-- Application connects with app_readonly for reads
+LOGOUT
+LOGIN app_readonly appreadpass
+-- Perform read operations
+```
+
+### Multi-tenant Pattern
+
+```sql
+-- Create tenant-specific users
+CREATE USER tenant1_user tenant1pass USER
+CREATE USER tenant2_user tenant2pass USER
+CREATE USER tenant1_readonly tenant1readpass READONLY
+CREATE USER tenant2_readonly tenant2readpass READONLY
+
+-- Each tenant uses their own user
+LOGIN tenant1_user tenant1pass
+-- Tenant 1 operations
+
+LOGOUT
+LOGIN tenant2_user tenant2pass
+-- Tenant 2 operations
+```
+
+### Backup User Pattern
+
+```sql
+-- Create dedicated backup user
+CREATE USER backup_user backuppass ADMIN
+
+-- Automated backup script
+LOGIN backup_user backuppass
+BACKUP TO ./daily_backup.db DESCRIPTION "Daily automated backup"
+LOGOUT
+```
+
+## Troubleshooting Authentication
+
+### Common Issues
+
+**Login failed:**
+```sql
+-- Check username and password
+LOGIN admin admin123
+
+-- Verify user exists
+LIST USERS
+```
+
+**Permission denied:**
+```sql
+-- Check current user role
+-- Admin users can perform all operations
+-- Standard users cannot manage users
+-- Readonly users can only read data
+```
+
+**Session expired:**
+```sql
+-- Re-login
+LOGIN username password
+```
+
+### Error Messages
+
+- **"Invalid credentials"**: Username or password incorrect
+- **"User not found"**: Username doesn't exist
+- **"Insufficient permissions"**: User role doesn't allow operation
+- **"Session expired"**: User session has timed out
+
+For more information about HaruDB's security features, see the [TLS documentation](/guides/tls/) and [Backup documentation](/guides/backup-restore/).
