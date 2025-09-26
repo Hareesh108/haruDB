@@ -1,27 +1,652 @@
 ---
 title: Troubleshooting
-description: Fix common issues when running HaruDB.
+description: Comprehensive guide to diagnosing and fixing common HaruDB issues.
 ---
 
-## Port already in use
+## Server Issues
+
+### Port Already in Use
+
+**Problem**: Server fails to start because port 54321 is already in use.
+
+**Symptoms**:
+```
+Error: listen tcp :54321: bind: address already in use
+```
+
+**Solutions**:
 
 ```bash
-# Kill existing process
+# Option 1: Kill existing process
 pkill harudb
-# Or use a different port
+
+# Option 2: Find and kill specific process
+ps aux | grep harudb
+kill -9 <process_id>
+
+# Option 3: Use different port
 ./harudb --port 54322
+
+# Option 4: Check what's using the port
+netstat -tlnp | grep 54321
+lsof -i :54321
 ```
 
-## WAL file corruption
+### Server Won't Start
 
-```bash
-# Remove WAL file to start fresh (data loss warning!)
-rm data/wal.log
+**Problem**: HaruDB server fails to start.
+
+**Symptoms**:
+```
+Error: failed to start server
 ```
 
-## Permission issues
+**Solutions**:
 
 ```bash
+# Check if binary is executable
 chmod +x harudb
+
+# Check data directory permissions
 chmod 755 data/
+
+# Check if data directory exists
+mkdir -p data
+
+# Check disk space
+df -h
+
+# Check system resources
+free -h
+top
 ```
+
+### Permission Denied
+
+**Problem**: Permission errors when starting server or accessing data.
+
+**Symptoms**:
+```
+Error: permission denied
+```
+
+**Solutions**:
+
+```bash
+# Fix binary permissions
+chmod +x harudb
+
+# Fix data directory permissions
+chmod 755 data/
+chmod 644 data/*.harudb
+
+# Check ownership
+ls -la harudb
+ls -la data/
+
+# Fix ownership if needed
+sudo chown $USER:$USER harudb
+sudo chown -R $USER:$USER data/
+```
+
+## Connection Issues
+
+### Connection Refused
+
+**Problem**: Cannot connect to HaruDB server.
+
+**Symptoms**:
+```
+telnet: connect to address 127.0.0.1: Connection refused
+```
+
+**Solutions**:
+
+```bash
+# Check if server is running
+ps aux | grep harudb
+
+# Check if server is listening on port
+netstat -tlnp | grep 54321
+
+# Start server if not running
+./harudb --data-dir ./data
+
+# Check firewall settings
+sudo ufw status
+sudo iptables -L
+
+# Test connection
+telnet localhost 54321
+nc localhost 54321
+```
+
+### TLS Connection Issues
+
+**Problem**: TLS connections fail.
+
+**Symptoms**:
+```
+Error: TLS handshake failed
+```
+
+**Solutions**:
+
+```bash
+# Check TLS configuration
+./harudb --data-dir ./data --tls --help
+
+# Verify TLS certificates
+openssl x509 -in cert.pem -text -noout
+
+# Test TLS connection
+openssl s_client -connect localhost:54321
+
+# Check TLS version compatibility
+./harudb --data-dir ./data --tls --tls-min-version 1.2
+```
+
+### Timeout Issues
+
+**Problem**: Connections timeout or hang.
+
+**Symptoms**:
+```
+Connection timeout
+```
+
+**Solutions**:
+
+```bash
+# Check network connectivity
+ping localhost
+
+# Check server load
+top
+htop
+
+# Check for deadlocks
+ps aux | grep harudb
+
+# Restart server
+pkill harudb
+./harudb --data-dir ./data
+```
+
+## Data Issues
+
+### WAL File Corruption
+
+**Problem**: Write-Ahead Log file is corrupted.
+
+**Symptoms**:
+```
+Error: WAL file corrupted
+Error: failed to replay WAL
+```
+
+**Solutions**:
+
+```bash
+# Option 1: Remove WAL file (data loss warning!)
+rm data/wal.log
+
+# Option 2: Backup WAL file first
+cp data/wal.log data/wal.log.backup
+rm data/wal.log
+
+# Option 3: Check WAL file integrity
+file data/wal.log
+hexdump -C data/wal.log | head
+
+# Option 4: Restore from backup
+RESTORE FROM ./backups/latest_backup.db
+```
+
+### Data File Corruption
+
+**Problem**: Database files are corrupted.
+
+**Symptoms**:
+```
+Error: invalid JSON format
+Error: table file corrupted
+```
+
+**Solutions**:
+
+```bash
+# Check file integrity
+file data/*.harudb
+
+# Check JSON validity
+python3 -m json.tool data/users.harudb
+
+# Backup corrupted files
+cp data/users.harudb data/users.harudb.backup
+
+# Restore from backup
+RESTORE FROM ./backups/latest_backup.db
+
+# Recreate table if necessary
+DROP TABLE users;
+CREATE TABLE users (id, name, email);
+```
+
+### Missing Data
+
+**Problem**: Data appears to be missing or incomplete.
+
+**Symptoms**:
+```
+Table users not found
+No data returned from queries
+```
+
+**Solutions**:
+
+```sql
+-- Check if table exists
+SELECT * FROM users;
+
+-- List all tables
+-- (HaruDB doesn't have SHOW TABLES, check data directory)
+-- ls data/*.harudb
+
+-- Check data directory
+-- ls -la data/
+
+-- Restore from backup
+RESTORE FROM ./backups/latest_backup.db
+```
+
+## Performance Issues
+
+### Slow Queries
+
+**Problem**: Queries are running slowly.
+
+**Symptoms**:
+```
+Queries take a long time to complete
+High CPU usage during queries
+```
+
+**Solutions**:
+
+```sql
+-- Create indexes on frequently queried columns
+CREATE INDEX ON users (email);
+CREATE INDEX ON products (category);
+
+-- Use specific columns instead of SELECT *
+SELECT name, email FROM users WHERE age > 25;
+
+-- Use appropriate WHERE conditions
+SELECT * FROM users WHERE email = 'alice@example.com';
+
+-- Check if indexes are being used
+-- (Queries with equality conditions use indexes)
+```
+
+### High Memory Usage
+
+**Problem**: HaruDB is using too much memory.
+
+**Symptoms**:
+```
+High memory usage in top/htop
+System running out of memory
+```
+
+**Solutions**:
+
+```bash
+# Check memory usage
+free -h
+top -p $(pgrep harudb)
+
+# Check for memory leaks
+ps aux | grep harudb
+
+# Restart server
+pkill harudb
+./harudb --data-dir ./data
+
+# Monitor memory usage
+watch -n 1 'ps aux | grep harudb'
+```
+
+### Disk Space Issues
+
+**Problem**: Running out of disk space.
+
+**Symptoms**:
+```
+Error: no space left on device
+```
+
+**Solutions**:
+
+```bash
+# Check disk usage
+df -h
+
+# Check data directory size
+du -sh data/
+
+# Clean up old backups
+find ./backups -name "*.db" -mtime +30 -delete
+
+# Clean up WAL files (if safe)
+rm data/wal.log
+
+# Move data to larger disk
+mv data/ /path/to/larger/disk/
+./harudb --data-dir /path/to/larger/disk/data
+```
+
+## Authentication Issues
+
+### Login Failed
+
+**Problem**: Cannot login to HaruDB.
+
+**Symptoms**:
+```
+Error: invalid credentials
+Error: user not found
+```
+
+**Solutions**:
+
+```sql
+-- Check username and password
+LOGIN admin admin123
+
+-- Verify user exists
+LIST USERS
+
+-- Check user permissions
+-- (Only admin users can list users)
+
+-- Reset to default admin
+-- (If all users are locked out, restart server)
+```
+
+### Permission Denied
+
+**Problem**: User doesn't have permission for operation.
+
+**Symptoms**:
+```
+Error: insufficient permissions
+Error: access denied
+```
+
+**Solutions**:
+
+```sql
+-- Check current user role
+-- (Admin users have full access)
+-- (Standard users cannot manage users)
+-- (Readonly users can only read data)
+
+-- Login as admin
+LOGIN admin admin123
+
+-- Create user with appropriate role
+CREATE USER username password ADMIN
+CREATE USER username password USER
+CREATE USER username password READONLY
+```
+
+## Transaction Issues
+
+### Transaction Deadlock
+
+**Problem**: Transactions are deadlocked.
+
+**Symptoms**:
+```
+Transaction hangs
+High CPU usage
+```
+
+**Solutions**:
+
+```sql
+-- Rollback current transaction
+ROLLBACK;
+
+-- Check for long-running transactions
+-- (HaruDB doesn't have transaction monitoring yet)
+
+-- Restart server if necessary
+-- pkill harudb
+-- ./harudb --data-dir ./data
+```
+
+### Transaction Rollback Issues
+
+**Problem**: Transaction rollback fails.
+
+**Symptoms**:
+```
+Error: rollback failed
+Error: transaction not found
+```
+
+**Solutions**:
+
+```sql
+-- Check if transaction is active
+-- (HaruDB doesn't have transaction status yet)
+
+-- Try to commit instead
+COMMIT;
+
+-- Start new transaction
+BEGIN TRANSACTION;
+
+-- Use savepoints for partial rollbacks
+SAVEPOINT sp1;
+-- ... operations ...
+ROLLBACK TO SAVEPOINT sp1;
+```
+
+## Backup and Restore Issues
+
+### Backup Failed
+
+**Problem**: Backup operation fails.
+
+**Symptoms**:
+```
+Error: backup failed
+Error: insufficient permissions
+```
+
+**Solutions**:
+
+```sql
+-- Check admin permissions
+LOGIN admin admin123
+
+-- Check disk space
+-- df -h
+
+-- Check backup directory permissions
+-- ls -la ./backups/
+
+-- Create backup directory
+-- mkdir -p ./backups
+
+-- Try different backup location
+BACKUP TO ./backup.db DESCRIPTION "Test backup"
+```
+
+### Restore Failed
+
+**Problem**: Restore operation fails.
+
+**Symptoms**:
+```
+Error: restore failed
+Error: invalid backup file
+```
+
+**Solutions**:
+
+```sql
+-- Check backup file exists
+-- ls -la ./backups/backup.db
+
+-- Check backup file integrity
+-- file ./backups/backup.db
+
+-- Check admin permissions
+LOGIN admin admin123
+
+-- Try different backup file
+RESTORE FROM ./backups/other_backup.db
+```
+
+## System Issues
+
+### Process Not Responding
+
+**Problem**: HaruDB process is not responding.
+
+**Symptoms**:
+```
+Process appears hung
+No response to commands
+```
+
+**Solutions**:
+
+```bash
+# Check process status
+ps aux | grep harudb
+
+# Check if process is responsive
+kill -0 $(pgrep harudb)
+
+# Force kill if necessary
+kill -9 $(pgrep harudb)
+
+# Restart server
+./harudb --data-dir ./data
+```
+
+### System Resource Exhaustion
+
+**Problem**: System resources are exhausted.
+
+**Symptoms**:
+```
+System slow or unresponsive
+High CPU/memory usage
+```
+
+**Solutions**:
+
+```bash
+# Check system resources
+top
+htop
+free -h
+df -h
+
+# Check for resource limits
+ulimit -a
+
+# Increase limits if needed
+ulimit -n 65536
+ulimit -u 32768
+
+# Restart server
+pkill harudb
+./harudb --data-dir ./data
+```
+
+## Debugging Tools
+
+### Log Analysis
+
+```bash
+# Check system logs
+journalctl -u harudb
+tail -f /var/log/syslog
+
+# Check HaruDB logs (if available)
+tail -f data/harudb.log
+
+# Check WAL file
+hexdump -C data/wal.log | head
+```
+
+### Process Monitoring
+
+```bash
+# Monitor HaruDB process
+watch -n 1 'ps aux | grep harudb'
+
+# Monitor system resources
+htop
+iotop
+nethogs
+
+# Monitor network connections
+netstat -tlnp | grep 54321
+ss -tlnp | grep 54321
+```
+
+### Data Validation
+
+```bash
+# Check data directory
+ls -la data/
+
+# Validate JSON files
+python3 -m json.tool data/users.harudb
+
+# Check file permissions
+ls -la data/*.harudb
+
+# Check disk usage
+du -sh data/
+```
+
+## Getting Help
+
+### Error Reporting
+
+When reporting issues, include:
+
+1. **HaruDB version**: `./harudb --version`
+2. **System information**: `uname -a`
+3. **Error messages**: Complete error output
+4. **Steps to reproduce**: Detailed reproduction steps
+5. **Log files**: Relevant log entries
+
+### Community Support
+
+- **GitHub Issues**: Report bugs and feature requests
+- **Documentation**: Check this troubleshooting guide
+- **Examples**: Review example scripts and configurations
+
+### Emergency Recovery
+
+```bash
+# Complete system recovery
+pkill harudb
+rm -rf data/
+mkdir data
+./harudb --data-dir ./data
+LOGIN admin admin123
+RESTORE FROM ./backups/latest_backup.db
+```
+
+For more information about HaruDB's features, see the [Quick Start Guide](/guides/quick-start/) and [SQL Operations Guide](/guides/sql-operations/).
