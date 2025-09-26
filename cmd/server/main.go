@@ -3,6 +3,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hareesh108/haruDB/internal/auth"
 	"github.com/Hareesh108/haruDB/internal/parser"
 )
 
@@ -20,6 +22,7 @@ func main() {
 	port := "54321"
 
 	dataDir := flag.String("data-dir", "./data", "Directory to store .harudb files")
+	enableTLS := flag.Bool("tls", false, "Enable TLS encryption")
 	flag.Parse()
 
 	// Make sure the data directory exists
@@ -27,13 +30,37 @@ func main() {
 		log.Fatalf("Failed to create data dir %s: %v", *dataDir, err)
 	}
 
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		log.Fatalf("Failed to listen on port %s: %v", port, err)
+	// Initialize TLS manager if enabled
+	var tlsManager *auth.TLSManager
+	if *enableTLS {
+		tlsManager = auth.NewTLSManager(*dataDir)
+		if !tlsManager.IsTLSEnabled() {
+			log.Printf("Warning: TLS requested but not properly configured")
+		} else {
+			fmt.Printf("🔒 TLS encryption enabled\n")
+		}
+	}
+
+	var listener net.Listener
+	var err error
+
+	if *enableTLS && tlsManager != nil && tlsManager.IsTLSEnabled() {
+		// Create TLS listener
+		tcpListener, err := net.Listen("tcp", ":"+port)
+		if err != nil {
+			log.Fatalf("Failed to listen on port %s: %v", port, err)
+		}
+		listener = tls.NewListener(tcpListener, tlsManager.GetTLSConfig())
+		fmt.Printf("🚀 HaruDB server started on port %s with TLS (data dir: %s)\n", port, *dataDir)
+	} else {
+		// Create regular TCP listener
+		listener, err = net.Listen("tcp", ":"+port)
+		if err != nil {
+			log.Fatalf("Failed to listen on port %s: %v", port, err)
+		}
+		fmt.Printf("🚀 HaruDB server started on port %s (data dir: %s)\n", port, *dataDir)
 	}
 	defer listener.Close()
-
-	fmt.Printf("🚀 HaruDB server started on port %s (data dir: %s)\n", port, *dataDir)
 
 	engine := parser.NewEngine(*dataDir)
 

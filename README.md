@@ -109,6 +109,21 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 - **Atomic writes** - Changes are either fully applied or not at all
 - **Data consistency** - WAL ensures database state integrity
 
+### 🔐 **Authentication & Security**
+
+- **User Management** - Create, delete, and manage database users
+- **Role-based Access Control** - Admin, User, and ReadOnly roles
+- **Session Management** - Secure session handling with automatic cleanup
+- **TLS Encryption** - Optional TLS support for secure connections
+- **Password Security** - SHA-256 password hashing
+
+### 💾 **Backup & Restore**
+
+- **Full Database Backup** - Compressed tar.gz backups with metadata
+- **Point-in-time Recovery** - Restore from any backup
+- **Backup Information** - Detailed backup metadata and statistics
+- **Backup Management** - List and manage backup files
+
 ---
 
 ## 📦 Planned Full Features (Roadmap)
@@ -121,13 +136,13 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 | Basic SQL operations (CRUD)      | ✅ **Implemented** |
 | Indexes & query optimization     | ✅ **Implemented** |
 | Advanced WHERE clauses           | ✅ **Implemented**    |
-| Transactions & ACID compliance  `| ✅ **Implemented**    |
-| Concurrency & locking            | 🔜 Planned    |
-| Custom wire protocol             | 🔜 Planned    |
+| Transactions & ACID compliance   | ✅ **Implemented**    |
+| Concurrency & locking            | ✅ **Implemented** |
+| Custom wire protocol             | ✅ **Implemented** |
 | CLI client (`haru-cli`)          | ✅ **Implemented** |
-| Authentication & TLS             | 🔜 Planned    |
-| Multi-user support               | 🔜 Planned    |
-| Backup & restore                 | 🔜 Planned    |
+| Authentication & TLS             | ✅ **Implemented** |
+| Multi-user support               | ✅ **Implemented** |
+| Backup & restore                 | ✅ **Implemented** |
 | Docker & Kubernetes deployment   | ✅ Ready      |
 
 ---
@@ -303,8 +318,11 @@ HaruDB implements a robust WAL system that ensures data durability and crash rec
 ### **1. Start the Server**
 
 ```bash
-# Using the binary
+# Using the binary (without TLS)
 ./harudb --data-dir ./data
+
+# Using the binary (with TLS encryption)
+./harudb --data-dir ./data --tls
 
 # Using Docker
 docker run -p 54321:54321 hareesh108/harudb:latest
@@ -415,6 +433,40 @@ SELECT * FROM accounts;
 COMMIT;
 SELECT * FROM accounts;
 
+```
+
+### **5. Authentication & User Management**
+
+```sql
+-- Login with default admin user
+LOGIN admin admin123
+
+-- Create new users
+CREATE USER john mypassword USER
+CREATE USER jane herpassword ADMIN
+CREATE USER readonly readpass READONLY
+
+-- List all users (admin only)
+LIST USERS
+
+-- Logout
+LOGOUT
+```
+
+### **6. Backup & Restore**
+
+```sql
+-- Create a backup
+BACKUP TO ./backups/my_backup.backup DESCRIPTION "Daily backup"
+
+-- List available backups
+LIST BACKUPS ./backups
+
+-- Get backup information
+BACKUP INFO ./backups/my_backup.backup
+
+-- Restore from backup (admin only)
+RESTORE FROM ./backups/my_backup.backup
 ```
 
 ## Advanced Transaction Features
