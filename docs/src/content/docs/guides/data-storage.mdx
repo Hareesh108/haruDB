@@ -1,0 +1,113 @@
+---
+title: Data Storage & Encryption
+description: HaruDB's secure page-based storage, encryption, decryption, and integrity verification.
+---
+
+## Overview
+
+HaruDB uses a secure, PostgreSQL-like, page-based storage engine with optional encryption and compression layered over robust checksums and atomic writes.
+
+## Storage Architecture
+
+- **Page-based storage**: Fixed 8KB pages with 64-byte headers
+- **Checksums**: CRC32 on page data to detect corruption
+- **Compression**: Optional gzip compression of page payloads
+- **Encryption**: Optional AES-256-GCM encryption at rest
+- **Atomic writes**: Temp file + rename to guarantee durability
+- **Hybrid mode**: Backward-compatible JSON persists alongside page storage
+
+### Page Layout
+
+```
++------------------+------------------+------------------+
+| Page Header (64) | Free Space Map   | Row Data         |
+| Magic, ver, ...  | (internal)       | variable-length  |
++------------------+------------------+------------------+
+```
+
+Header fields:
+- **Magic**: `HDBP`
+- **Version**: page format version
+- **Type**: data/index/overflow
+- **Checksum**: CRC32 of page data region
+- **PageNumber**: logical page id
+- **FreeOffset/FreeSize**: free space tracking
+- **RowCount**: number of rows on page
+- **Timestamp**: last write time
+
+## Write Path (step-by-step)
+
+1. **Serialize row**: Convert row into compact binary (length-prefixed fields)
+2. **Insert into page**: Append `uint16 length` + row bytes; update header
+3. **Compute checksum**: CRC32 over page data region only
+4. **Pack header**: 64-byte fixed layout, little-endian
+5. **Compression (optional)**: gzip page (header + data)
+6. **Encryption (optional)**: AES-256-GCM on compressed bytes
+7. **Atomic write**: Write to `*.tmp` then `rename()` to final
+
+Notes:
+- Order is critical: compress → encrypt. Read path decrypts → decompresses.
+- Header is never padded; it’s packed to exactly 64 bytes for consistency.
+
+## Read Path (step-by-step)
+
+1. **Read file**: Load page file bytes
+2. **Decrypt (optional)**: AES-256-GCM open; authenticate
+3. **Decompress (optional)**: gunzip
+4. **Unpack header**: Strict 64B parse; validate magic/version
+5. **Verify checksum**: CRC32(page data) == header.Checksum
+6. **Scan rows**: Iterate length-prefixed rows
+
+If any step fails, HaruDB aborts the read and reports a clear error (e.g. checksum mismatch).
+
+## Encryption Details
+
+- **Algorithm**: AES-256-GCM (authenticated encryption)
+- **Scope**: Entire page (header + data) after compression
+- **Nonce**: Fresh random nonce per write
+- **Authentication**: GCM tag ensures integrity & authenticity
+
+### Key Handling (current vs recommended)
+
+- **Current demo**: A random 256-bit key is generated per write and stored alongside ciphertext (for simplicity in dev mode).
+- **Recommended production**:
+  - Use a master key from a KMS or OS keyring
+  - Derive per-table/per-page keys via KDF
+  - Rotate keys and re-encrypt pages
+  - Never store raw keys with ciphertext
+
+## Compression Details
+
+- **Algorithm**: gzip
+- **Benefit**: Reduces storage (especially for text-heavy rows)
+- **Order**: Compress first, then encrypt (so cipher doesn't block compression)
+
+## Integrity & Durability
+
+- **CRC32**: Detects accidental corruption of page data
+- **Magic/version**: Detects format mismatch
+- **Atomic writes**: Temp write + fsync + rename + dir fsync
+- **WAL**: Write-Ahead Log records operations for crash recovery
+
+## Hybrid Mode (JSON + Pages)
+
+- Existing tables keep JSON for compatibility
+- New tables default to page storage
+- Reads prefer pages; JSON is a fallback path
+
+## Configuration Tips
+
+- Enable encryption in production
+- Keep WAL on a reliable disk
+- Back up both `*.page.*` and `*.meta` files
+- Rotate keys periodically with a planned re-encryption window
+
+## Troubleshooting
+
+- **Checksum mismatch**: Possible corruption or wrong header/data ordering
+- **Decrypt failed**: Wrong key/nonce or corrupted ciphertext
+- **Cannot read page**: Ensure decrypt → decompress order
+
+See also: [WAL](/reference/wal/), [Storage Engine](/reference/storage/), [Backup & Restore](/guides/backup-restore/).
+
+

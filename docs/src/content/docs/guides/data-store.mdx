@@ -1,0 +1,169 @@
+---
+title: Data Store — Encryption & Decryption
+description: How HaruDB stores data on disk, secures it in transit with TLS, and the design for optional at-rest encryption.
+---
+
+## Overview
+
+This guide explains how HaruDB stores data and how encryption works today:
+
+- Transport encryption with TLS for client ↔ server connections.
+- Current on-disk format (JSON-backed `.harudb` files and `wal.log`).
+- A proposed design for at-rest encryption (keys, rotation, integrity).
+
+## Transport Encryption (TLS)
+
+HaruDB supports TLS to encrypt data in transit between clients and the server.
+
+### Server
+
+```bash
+./harudb --data-dir ./data --tls
+
+# With custom certificate and key
+./harudb --data-dir ./data --tls \
+  --tls-cert ./cert.pem \
+  --tls-key ./key.pem
+```
+
+When TLS is enabled without providing files, HaruDB generates a self‑signed
+certificate inside the data directory (`server.crt`, `server.key`). The server
+enforces modern TLS versions and cipher suites.
+
+### Client
+
+```bash
+haru-cli --tls
+
+# Remote example
+haru-cli --host db.example.com --port 54321 --tls
+```
+
+## Data Store Format (On Disk)
+
+HaruDB persists tables as human‑readable JSON files with the `.harudb` extension.
+
+- Each table is saved atomically via temp‑file + rename, with directory fsync.
+- The Write‑Ahead Log (`wal.log`) records operations for crash recovery.
+
+Conceptually:
+
+```text
+data/
+  users.harudb        # table snapshot (JSON)
+  users.meta          # table metadata (if present)
+  wal.log             # write-ahead log
+  server.crt/key      # TLS (if auto-generated)
+```
+
+At startup, HaruDB loads all `.harudb` files and may replay `wal.log` to
+restore the latest consistent state.
+
+## At‑Rest Encryption (Design Spec)
+
+At the moment, table snapshots and WAL entries are written in plaintext JSON.
+The following design adds optional at‑rest encryption while preserving the
+atomic and crash‑safe properties of the storage engine.
+
+### Goals
+
+- Encrypt table snapshots and WAL contents at rest.
+- Provide strong integrity (tamper detection) for each file/chunk.
+- Keep atomic rename and durable fsync semantics.
+- Support key rotation without rewriting all data at once.
+
+### Threat Model
+
+- Protect against offline access to the data directory (e.g., disk theft).
+- Not intended to protect data from a compromised running host with access to
+  process memory and keys.
+
+### Cryptography
+
+- AES‑256‑GCM for authenticated encryption (AEAD) with random per‑object nonce.
+- Per‑file or per‑chunk keys derived from a primary Data Encryption Key (DEK)
+  via HKDF‑SHA‑256 with unique salt.
+- Master Key (MK) protects the DEK using envelope encryption.
+
+### Key Hierarchy
+
+1. Master Key (MK): Provided via environment, KMS, or OS keyring.
+2. Data Encryption Key (DEK): Random 256‑bit key, encrypted by MK and stored in
+   `data/keyring.json` along with key version metadata.
+3. File/Chunk Keys: Derived from DEK using HKDF with context (table name,
+   object type, version).
+
+Example `keyring.json` (conceptual):
+
+```json
+{
+  "current_version": 3,
+  "keys": {
+    "1": { "dek_enc": "base64(MK(AES-256-GCM(DEK)))" },
+    "2": { "dek_enc": "..." },
+    "3": { "dek_enc": "..." }
+  }
+}
+```
+
+### File Layouts
+
+- Snapshot (`.harudb.enc`):
+  - Header: magic, version, key_version, nonce, optional salt
+  - Body: AEAD‑encrypted JSON payload
+  - Auth: GCM tag (implicit)
+
+- WAL (`wal.log.enc`):
+  - Stream of length‑prefixed AEAD records
+  - Each record uses a fresh nonce; record boundaries aid partial recovery
+
+### Operations
+
+- Write snapshot: serialize JSON → encrypt with file key → write temp → fsync →
+  rename → fsync dir.
+- Read snapshot: read header → fetch DEK by key_version → derive file key →
+  decrypt → parse JSON.
+- WAL append: serialize → encrypt record → write length + ciphertext → fsync.
+- Replay WAL: read length → decrypt record → apply entry.
+
+### Key Rotation
+
+- Generate new DEK, store encrypted by MK with incremented `key_version`.
+- New writes use the latest version; background job re‑keys old snapshots/WAL
+  segments opportunistically.
+
+### Configuration
+
+```bash
+# Enable at-rest encryption (design)
+HARU_ENCRYPTION=on \
+HARU_MASTER_KEY=base64:... \
+./harudb --data-dir ./data
+```
+
+- If `HARU_MASTER_KEY` is absent, the server refuses to start with encryption.
+- For production, fetch MK from a cloud KMS or OS keyring rather than env.
+
+## Decryption Flow (Admin)
+
+To recover data on a separate system:
+
+1. Obtain the data directory and `keyring.json`.
+2. Supply the correct Master Key (or KMS access) to unwrap the DEK.
+3. The server derives the file keys and decrypts snapshots/WAL during startup.
+
+## Current Status
+
+- TLS in transit: available today and recommended for all deployments.
+- At‑rest encryption: the above is a spec; implementation is planned. Until
+  then, data on disk is plaintext JSON. Use full‑disk encryption (LUKS, BitLocker)
+  if at‑rest protection is required immediately.
+
+## Best Practices
+
+- Always enable TLS in production.
+- Restrict filesystem permissions of the data directory.
+- Back up the `keyring.json` and MK securely once at‑rest encryption is enabled.
+- Consider full‑disk encryption to complement database‑level encryption.
+
+

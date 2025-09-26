@@ -33,6 +33,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Authentication & Users', slug: 'guides/authentication' },
 						{ label: 'Backup & Restore', slug: 'guides/backup-restore' },
+						{ label: 'Data Storage & Encryption', slug: 'guides/data-storage' },
 					],
 				},
 				{
