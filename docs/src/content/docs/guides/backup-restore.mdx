@@ -1,0 +1,393 @@
+---
+title: Backup & Restore
+description: Complete guide to creating, managing, and restoring HaruDB backups with point-in-time recovery.
+---
+
+## Overview
+
+HaruDB provides comprehensive backup and restore capabilities:
+
+- **Full Database Backup**: Complete database snapshots with metadata
+- **Point-in-time Recovery**: Restore from any backup
+- **Backup Information**: Detailed backup metadata and statistics
+- **Backup Management**: List and manage backup files
+- **Compressed Storage**: Efficient tar.gz backup format
+
+## Backup Commands
+
+### BACKUP TO
+
+Create a full database backup to a specified location.
+
+```sql
+-- Basic backup
+BACKUP TO ./backup.db
+
+-- Backup with description
+BACKUP TO ./backup.db DESCRIPTION "Daily backup"
+
+-- Backup to specific directory
+BACKUP TO ./backups/weekly_backup.db DESCRIPTION "Weekly backup"
+
+-- Backup with timestamp
+BACKUP TO ./backups/backup_2024-01-15.db DESCRIPTION "Backup from 2024-01-15"
+```
+
+**Notes:**
+- Only admin users can create backups
+- Backup files are compressed tar.gz format
+- Includes all tables, indexes, and metadata
+- Backup path must be writable
+
+### LIST BACKUPS
+
+Display all available backups in a directory.
+
+```sql
+-- List backups in current directory
+LIST BACKUPS
+
+-- List backups in specific directory
+LIST BACKUPS ./backups
+
+-- List backups with details
+LIST BACKUPS ./backups DETAILED
+```
+
+**Output example:**
+```
+Backups in ./backups:
+- backup_2024-01-15.db (2024-01-15 10:30:00, Size: 2.5MB, Tables: 5)
+- backup_2024-01-14.db (2024-01-14 10:30:00, Size: 2.3MB, Tables: 5)
+- backup_2024-01-13.db (2024-01-13 10:30:00, Size: 2.1MB, Tables: 4)
+```
+
+### BACKUP INFO
+
+Get detailed information about a specific backup.
+
+```sql
+-- Get backup information
+BACKUP INFO ./backups/backup_2024-01-15.db
+
+-- Get backup information with statistics
+BACKUP INFO ./backups/backup_2024-01-15.db STATS
+```
+
+**Output example:**
+```
+Backup Information:
+File: ./backups/backup_2024-01-15.db
+Created: 2024-01-15 10:30:00
+Size: 2.5MB
+Description: Daily backup
+Tables: 5
+- users (100 rows)
+- products (50 rows)
+- orders (200 rows)
+- customers (75 rows)
+- inventory (25 rows)
+Indexes: 8
+WAL Entries: 150
+```
+
+## Restore Commands
+
+### RESTORE FROM
+
+Restore database from a backup file.
+
+```sql
+-- Restore from backup
+RESTORE FROM ./backups/backup_2024-01-15.db
+
+-- Restore with confirmation
+RESTORE FROM ./backups/backup_2024-01-15.db CONFIRM
+
+-- Restore to specific state
+RESTORE FROM ./backups/backup_2024-01-15.db TO_STATE "clean"
+```
+
+**Notes:**
+- Only admin users can restore backups
+- Current database will be completely replaced
+- All existing data will be lost
+- Backup file must be readable and valid
+
+## Complete Backup Example
+
+```sql
+-- Login as admin
+LOGIN admin admin123
+
+-- Create sample data
+CREATE TABLE users (id, name, email, created_at);
+CREATE TABLE products (id, name, price, category);
+CREATE TABLE orders (id, user_id, product_id, quantity, total);
+
+-- Insert sample data
+INSERT INTO users VALUES (1, 'Alice', 'alice@example.com', '2024-01-15');
+INSERT INTO users VALUES (2, 'Bob', 'bob@example.com', '2024-01-15');
+INSERT INTO products VALUES (1, 'Laptop', '999.99', 'Electronics');
+INSERT INTO products VALUES (2, 'Mouse', '29.99', 'Electronics');
+INSERT INTO orders VALUES (1, 1, 1, 1, '999.99');
+INSERT INTO orders VALUES (2, 2, 2, 2, '59.98');
+
+-- Create indexes
+CREATE INDEX ON users (email);
+CREATE INDEX ON products (category);
+CREATE INDEX ON orders (user_id);
+
+-- Create backup
+BACKUP TO ./backups/daily_backup_2024-01-15.db DESCRIPTION "Daily backup with sample data"
+
+-- List backups
+LIST BACKUPS ./backups
+
+-- Get backup information
+BACKUP INFO ./backups/daily_backup_2024-01-15.db
+
+-- Add more data
+INSERT INTO users VALUES (3, 'Charlie', 'charlie@example.com', '2024-01-15');
+INSERT INTO products VALUES (3, 'Keyboard', '79.99', 'Electronics');
+
+-- Create another backup
+BACKUP TO ./backups/evening_backup_2024-01-15.db DESCRIPTION "Evening backup with additional data"
+
+-- List all backups
+LIST BACKUPS ./backups
+```
+
+## Restore Example
+
+```sql
+-- Login as admin
+LOGIN admin admin123
+
+-- Check current data
+SELECT * FROM users;
+SELECT * FROM products;
+
+-- List available backups
+LIST BACKUPS ./backups
+
+-- Restore from earlier backup
+RESTORE FROM ./backups/daily_backup_2024-01-15.db
+
+-- Verify restore
+SELECT * FROM users;
+SELECT * FROM products;
+
+-- Check that newer data is gone
+SELECT * FROM users WHERE name = 'Charlie';
+-- Should return empty (Charlie was added after the backup)
+```
+
+## Backup Strategies
+
+### Daily Backups
+
+```sql
+-- Create daily backup script
+-- Run this daily at 2 AM
+LOGIN admin admin123
+BACKUP TO ./backups/daily_$(date +%Y-%m-%d).db DESCRIPTION "Daily backup $(date)"
+LOGOUT
+```
+
+### Weekly Backups
+
+```sql
+-- Create weekly backup script
+-- Run this weekly on Sunday at 3 AM
+LOGIN admin admin123
+BACKUP TO ./backups/weekly_$(date +%Y-%m-%d).db DESCRIPTION "Weekly backup $(date)"
+LOGOUT
+```
+
+### Monthly Backups
+
+```sql
+-- Create monthly backup script
+-- Run this monthly on the 1st at 4 AM
+LOGIN admin admin123
+BACKUP TO ./backups/monthly_$(date +%Y-%m).db DESCRIPTION "Monthly backup $(date)"
+LOGOUT
+```
+
+## Automated Backup Scripts
+
+### Bash Script Example
+
+```bash
+#!/bin/bash
+# backup_script.sh
+
+BACKUP_DIR="./backups"
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+BACKUP_FILE="$BACKUP_DIR/backup_$DATE.db"
+
+# Create backup directory if it doesn't exist
+mkdir -p "$BACKUP_DIR"
+
+# Create backup
+echo "Creating backup: $BACKUP_FILE"
+haru-cli << EOF
+LOGIN admin admin123
+BACKUP TO $BACKUP_FILE DESCRIPTION "Automated backup $DATE"
+LOGOUT
+EOF
+
+# Check if backup was successful
+if [ $? -eq 0 ]; then
+    echo "Backup completed successfully: $BACKUP_FILE"
+else
+    echo "Backup failed!"
+    exit 1
+fi
+
+# Clean up old backups (keep last 30 days)
+find "$BACKUP_DIR" -name "backup_*.db" -mtime +30 -delete
+echo "Old backups cleaned up"
+```
+
+### Cron Job Setup
+
+```bash
+# Add to crontab for daily backups at 2 AM
+0 2 * * * /path/to/backup_script.sh
+
+# Add to crontab for weekly backups on Sunday at 3 AM
+0 3 * * 0 /path/to/backup_script.sh
+
+# Add to crontab for monthly backups on 1st at 4 AM
+0 4 1 * * /path/to/backup_script.sh
+```
+
+## Backup Management
+
+### Backup Rotation
+
+```sql
+-- List all backups
+LIST BACKUPS ./backups
+
+-- Get backup sizes
+BACKUP INFO ./backups/backup_2024-01-15.db STATS
+BACKUP INFO ./backups/backup_2024-01-14.db STATS
+BACKUP INFO ./backups/backup_2024-01-13.db STATS
+
+-- Manual cleanup (delete old backups)
+-- Note: HaruDB doesn't have a DELETE BACKUP command
+-- Use system commands to remove old backup files
+```
+
+### Backup Verification
+
+```sql
+-- Verify backup integrity
+BACKUP INFO ./backups/backup_2024-01-15.db STATS
+
+-- Test restore to temporary location
+-- (This would require restoring to a test database)
+```
+
+## Disaster Recovery
+
+### Complete Database Recovery
+
+```sql
+-- In case of complete database loss
+-- 1. Start fresh HaruDB instance
+./harudb --data-dir ./data
+
+-- 2. Login as admin
+LOGIN admin admin123
+
+-- 3. Restore from latest backup
+RESTORE FROM ./backups/latest_backup.db
+
+-- 4. Verify data integrity
+SELECT COUNT(*) FROM users;
+SELECT COUNT(*) FROM products;
+SELECT COUNT(*) FROM orders;
+```
+
+### Point-in-time Recovery
+
+```sql
+-- Restore to specific point in time
+-- 1. List available backups
+LIST BACKUPS ./backups
+
+-- 2. Choose backup closest to desired time
+BACKUP INFO ./backups/backup_2024-01-15.db
+
+-- 3. Restore from that backup
+RESTORE FROM ./backups/backup_2024-01-15.db
+
+-- 4. Verify restored state
+SELECT * FROM users;
+SELECT * FROM products;
+```
+
+## Best Practices
+
+### Backup Frequency
+
+1. **Production databases**: Daily backups minimum
+2. **Development databases**: Weekly backups
+3. **Test databases**: Before major changes
+
+### Backup Storage
+
+1. **Local storage**: Keep recent backups locally
+2. **Remote storage**: Store backups off-site
+3. **Multiple locations**: Use different storage systems
+
+### Backup Testing
+
+1. **Regular restore tests**: Verify backups work
+2. **Disaster recovery drills**: Practice recovery procedures
+3. **Backup integrity checks**: Validate backup files
+
+### Security
+
+1. **Encrypt backups**: Use encryption for sensitive data
+2. **Access control**: Limit backup file access
+3. **Secure storage**: Store backups securely
+
+## Troubleshooting
+
+### Common Issues
+
+**Backup failed:**
+```sql
+-- Check permissions
+-- Ensure backup directory is writable
+-- Verify admin user has backup permissions
+```
+
+**Restore failed:**
+```sql
+-- Check backup file exists
+-- Verify backup file is not corrupted
+-- Ensure admin user has restore permissions
+```
+
+**Backup file not found:**
+```sql
+-- Check file path
+-- Verify backup directory exists
+-- List available backups
+LIST BACKUPS ./backups
+```
+
+### Error Messages
+
+- **"Backup failed"**: Insufficient permissions or disk space
+- **"Restore failed"**: Backup file corrupted or not found
+- **"Invalid backup file"**: Backup file format is invalid
+- **"Permission denied"**: User doesn't have admin privileges
+
+For more information about HaruDB's data integrity features, see the [Data Integrity Guide](/guides/data-integrity/) and [WAL documentation](/reference/wal/).
