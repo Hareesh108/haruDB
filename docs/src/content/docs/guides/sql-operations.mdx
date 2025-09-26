@@ -1,27 +1,371 @@
 ---
 title: SQL Operations
-description: Supported DDL and DML commands in HaruDB.
+description: Complete guide to DDL and DML commands, advanced WHERE clauses, and query optimization in HaruDB.
 ---
 
-## DDL
+## Data Definition Language (DDL)
 
-- `CREATE TABLE` — Create tables with custom schemas
-- `DROP TABLE` — Remove tables and associated data
+### CREATE TABLE
 
-## DML
-
-- `INSERT` — Add new rows to tables
-- `SELECT` — Query and display table data
-- `UPDATE` — Modify existing rows by index
-- `DELETE` — Remove rows by index
-
-### Examples
+Create tables with custom schemas. Column types are inferred from data.
 
 ```sql
-CREATE TABLE users (id, name, email);
-INSERT INTO users VALUES (1, 'Hareesh', 'hareesh@example.com');
-SELECT * FROM users;
-UPDATE users SET name = 'Hareesh Updated' ROW 0;
-DELETE FROM users ROW 0;
-DROP TABLE users;
+-- Basic table creation
+CREATE TABLE users (id, name, email, age);
+
+-- Table with more columns
+CREATE TABLE products (id, name, price, category, description, created_at);
+
+-- Table for orders
+CREATE TABLE orders (id, user_id, product_id, quantity, total, order_date);
 ```
+
+**Notes:**
+- Column names are case-sensitive
+- No explicit data types required (HaruDB infers types from values)
+- Tables are stored as JSON files (`.harudb` format)
+
+### DROP TABLE
+
+Remove tables and all associated data permanently.
+
+```sql
+-- Drop a table
+DROP TABLE users;
+
+-- Drop multiple tables
+DROP TABLE products;
+DROP TABLE orders;
+```
+
+**Warning:** This operation is irreversible and will delete all data in the table.
+
+## Data Manipulation Language (DML)
+
+### INSERT
+
+Add new rows to tables.
+
+```sql
+-- Insert single row
+INSERT INTO users VALUES (1, 'Alice', 'alice@example.com', '25');
+
+-- Insert multiple rows
+INSERT INTO users VALUES (2, 'Bob', 'bob@example.com', '30');
+INSERT INTO users VALUES (3, 'Charlie', 'charlie@example.com', '35');
+
+-- Insert with different data types
+INSERT INTO products VALUES (1, 'Laptop', '999.99', 'Electronics', 'High-performance laptop', '2024-01-15');
+INSERT INTO products VALUES (2, 'Mouse', '29.99', 'Electronics', 'Wireless mouse', '2024-01-15');
+```
+
+**Notes:**
+- Values must match the number of columns
+- String values should be quoted
+- Numeric values can be quoted or unquoted
+
+### SELECT
+
+Query and display table data with powerful filtering capabilities.
+
+#### Basic SELECT Operations
+
+```sql
+-- Select all columns
+SELECT * FROM users;
+
+-- Select specific columns
+SELECT name, email FROM users;
+
+-- Select with aliases
+SELECT name AS user_name, email AS user_email FROM users;
+
+-- Count records
+SELECT COUNT(*) FROM users;
+
+-- Count with condition
+SELECT COUNT(*) FROM users WHERE age > 25;
+```
+
+#### Advanced WHERE Clauses
+
+HaruDB supports comprehensive WHERE clause operations:
+
+##### Comparison Operators
+
+```sql
+-- Equality
+SELECT * FROM users WHERE age = '25';
+SELECT * FROM products WHERE category = 'Electronics';
+
+-- Inequality
+SELECT * FROM users WHERE age != '25';
+SELECT * FROM products WHERE price <> '999.99';
+
+-- Greater than
+SELECT * FROM users WHERE age > '25';
+SELECT * FROM products WHERE price > '100';
+
+-- Less than
+SELECT * FROM users WHERE age < '30';
+SELECT * FROM products WHERE price < '500';
+
+-- Greater than or equal
+SELECT * FROM users WHERE age >= '25';
+SELECT * FROM products WHERE price >= '100';
+
+-- Less than or equal
+SELECT * FROM users WHERE age <= '30';
+SELECT * FROM products WHERE price <= '500';
+```
+
+##### Pattern Matching with LIKE
+
+```sql
+-- Starts with pattern
+SELECT * FROM users WHERE name LIKE 'A%';
+SELECT * FROM products WHERE name LIKE 'Laptop%';
+
+-- Ends with pattern
+SELECT * FROM users WHERE email LIKE '%@example.com';
+SELECT * FROM products WHERE category LIKE '%Electronics';
+
+-- Contains pattern
+SELECT * FROM users WHERE name LIKE '%Alice%';
+SELECT * FROM products WHERE description LIKE '%wireless%';
+
+-- Single character wildcard
+SELECT * FROM users WHERE name LIKE 'A_ice';
+SELECT * FROM products WHERE name LIKE 'L_ptop';
+```
+
+##### Logical Operators
+
+```sql
+-- AND operator
+SELECT * FROM users WHERE age > '25' AND name LIKE 'A%';
+SELECT * FROM products WHERE category = 'Electronics' AND price < '100';
+
+-- OR operator
+SELECT * FROM users WHERE age < '25' OR age > '35';
+SELECT * FROM products WHERE category = 'Electronics' OR category = 'Furniture';
+
+-- NOT operator
+SELECT * FROM users WHERE NOT (age = '25');
+SELECT * FROM products WHERE NOT (category = 'Electronics');
+
+-- Complex combinations with parentheses
+SELECT * FROM users WHERE (age > '25' AND name LIKE 'A%') OR (age < '20' AND name LIKE 'B%');
+SELECT * FROM products WHERE category = 'Electronics' AND (price > '100' OR name LIKE '%Pro%');
+```
+
+##### NULL Handling
+
+```sql
+-- Check for NULL values
+SELECT * FROM users WHERE email IS NULL;
+SELECT * FROM products WHERE description IS NULL;
+
+-- Check for non-NULL values
+SELECT * FROM users WHERE email IS NOT NULL;
+SELECT * FROM products WHERE description IS NOT NULL;
+```
+
+### UPDATE
+
+Modify existing rows by index.
+
+```sql
+-- Update single column
+UPDATE users SET age = '26' ROW 0;
+
+-- Update multiple columns
+UPDATE users SET name = 'Alice Updated', email = 'alice.updated@example.com' ROW 0;
+
+-- Update with WHERE-like conditions (using row index)
+UPDATE products SET price = '1099.99' ROW 0;
+UPDATE products SET category = 'Premium Electronics' ROW 0;
+```
+
+**Notes:**
+- Row indices start from 0
+- Use `ROW <index>` to specify which row to update
+- Multiple columns can be updated in a single statement
+
+### DELETE
+
+Remove rows by index.
+
+```sql
+-- Delete single row
+DELETE FROM users ROW 0;
+
+-- Delete multiple rows (one at a time)
+DELETE FROM users ROW 1;
+DELETE FROM users ROW 2;
+
+-- Delete all rows (by dropping and recreating table)
+DROP TABLE users;
+CREATE TABLE users (id, name, email, age);
+```
+
+**Notes:**
+- Row indices start from 0
+- Use `ROW <index>` to specify which row to delete
+- Deleted rows cannot be recovered
+
+## Indexes and Query Optimization
+
+### CREATE INDEX
+
+Build in-memory hash indexes for faster lookups.
+
+```sql
+-- Create index on single column
+CREATE INDEX ON users (email);
+CREATE INDEX ON products (category);
+
+-- Create multiple indexes
+CREATE INDEX ON users (name);
+CREATE INDEX ON products (price);
+CREATE INDEX ON orders (user_id);
+```
+
+### Indexed Queries
+
+Queries with equality conditions automatically use indexes when available:
+
+```sql
+-- These queries will use indexes if created
+SELECT * FROM users WHERE email = 'alice@example.com';
+SELECT * FROM products WHERE category = 'Electronics';
+SELECT * FROM orders WHERE user_id = '1';
+
+-- These queries will not use indexes (no index on age)
+SELECT * FROM users WHERE age > '25';
+SELECT * FROM products WHERE price < '100';
+```
+
+## Complete Examples
+
+### E-commerce Database Example
+
+```sql
+-- Create tables
+CREATE TABLE customers (id, name, email, phone);
+CREATE TABLE products (id, name, price, category, stock);
+CREATE TABLE orders (id, customer_id, product_id, quantity, total, order_date);
+
+-- Insert sample data
+INSERT INTO customers VALUES (1, 'Alice Johnson', 'alice@example.com', '555-0101');
+INSERT INTO customers VALUES (2, 'Bob Smith', 'bob@example.com', '555-0102');
+INSERT INTO customers VALUES (3, 'Charlie Brown', 'charlie@example.com', '555-0103');
+
+INSERT INTO products VALUES (1, 'Laptop Pro', '1299.99', 'Electronics', '10');
+INSERT INTO products VALUES (2, 'Wireless Mouse', '29.99', 'Electronics', '50');
+INSERT INTO products VALUES (3, 'Office Chair', '199.99', 'Furniture', '15');
+
+INSERT INTO orders VALUES (1, 1, 1, 1, '1299.99', '2024-01-15');
+INSERT INTO orders VALUES (2, 1, 2, 2, '59.98', '2024-01-15');
+INSERT INTO orders VALUES (3, 2, 3, 1, '199.99', '2024-01-16');
+
+-- Create indexes for performance
+CREATE INDEX ON customers (email);
+CREATE INDEX ON products (category);
+CREATE INDEX ON orders (customer_id);
+
+-- Complex queries
+-- Find all electronics products under $100
+SELECT * FROM products WHERE category = 'Electronics' AND price < '100';
+
+-- Find customers with email addresses from example.com
+SELECT * FROM customers WHERE email LIKE '%@example.com';
+
+-- Find orders from a specific customer
+SELECT * FROM orders WHERE customer_id = '1';
+
+-- Find products with low stock
+SELECT * FROM products WHERE stock < '20';
+```
+
+### User Management Example
+
+```sql
+-- Create user table
+CREATE TABLE users (id, username, email, role, created_at, last_login);
+
+-- Insert users
+INSERT INTO users VALUES (1, 'admin', 'admin@company.com', 'admin', '2024-01-01', '2024-01-15');
+INSERT INTO users VALUES (2, 'john', 'john@company.com', 'user', '2024-01-02', '2024-01-14');
+INSERT INTO users VALUES (3, 'jane', 'jane@company.com', 'user', '2024-01-03', '2024-01-13');
+INSERT INTO users VALUES (4, 'bob', 'bob@company.com', 'readonly', '2024-01-04', '2024-01-12');
+
+-- Create indexes
+CREATE INDEX ON users (email);
+CREATE INDEX ON users (role);
+
+-- Query examples
+-- Find all admin users
+SELECT * FROM users WHERE role = 'admin';
+
+-- Find users who haven't logged in recently
+SELECT * FROM users WHERE last_login < '2024-01-14';
+
+-- Find users with specific email domain
+SELECT * FROM users WHERE email LIKE '%@company.com';
+
+-- Count users by role
+SELECT role, COUNT(*) FROM users GROUP BY role;
+```
+
+## Best Practices
+
+### Performance Optimization
+
+1. **Create indexes on frequently queried columns:**
+   ```sql
+   CREATE INDEX ON users (email);
+   CREATE INDEX ON products (category);
+   ```
+
+2. **Use specific column names in SELECT:**
+   ```sql
+   -- Good
+   SELECT name, email FROM users WHERE age > 25;
+   
+   -- Less efficient
+   SELECT * FROM users WHERE age > 25;
+   ```
+
+3. **Use appropriate WHERE conditions:**
+   ```sql
+   -- Use indexed columns when possible
+   SELECT * FROM users WHERE email = 'alice@example.com';
+   ```
+
+### Data Integrity
+
+1. **Always use transactions for multiple operations:**
+   ```sql
+   BEGIN TRANSACTION;
+   INSERT INTO orders VALUES (1, 1, 1, 1, '1299.99', '2024-01-15');
+   UPDATE products SET stock = '9' ROW 0;
+   COMMIT;
+   ```
+
+2. **Validate data before insertion:**
+   ```sql
+   -- Check if user exists before creating order
+   SELECT * FROM users WHERE id = '1';
+   ```
+
+### Error Handling
+
+HaruDB provides clear error messages for common issues:
+
+- **Table not found:** `Table users not found`
+- **Invalid row index:** `Row index out of range`
+- **Syntax errors:** `Invalid SQL syntax`
+- **Constraint violations:** `Duplicate key value`
+
+For more advanced features, see the [Transactions Guide](/guides/transactions/) and [Indexes Guide](/guides/indexes/).
