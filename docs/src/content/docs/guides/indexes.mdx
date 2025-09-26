@@ -1,15 +1,476 @@
 ---
 title: Indexes & Optimization
-description: Create indexes and run indexed queries for faster lookups.
+description: Complete guide to B-tree indexing, query optimization, and performance tuning in HaruDB.
 ---
 
-- `CREATE INDEX ON <table> (<column>)` — Build an in-memory hash index.
-- Equality filters use indexes when available: `SELECT ... WHERE <column> = 'value'`.
-- Index metadata is persisted; indexes are rebuilt on startup.
+## Overview
 
-```sql
-CREATE TABLE users (id, name, email);
-CREATE INDEX ON users (email);
-SELECT * FROM users WHERE email = 'alice@example.com';
+HaruDB uses **B-tree indexing** for efficient data retrieval and query optimization. B-trees provide excellent performance for range queries, equality searches, and ordered data access while maintaining balanced tree structure.
+
+## What is a B-tree?
+
+A **B-tree** (Balanced Tree) is a self-balancing tree data structure that maintains sorted data and allows searches, sequential access, insertions, and deletions in logarithmic time.
+
+### Key Characteristics of B-trees:
+
+- **Balanced**: All leaf nodes are at the same level
+- **Ordered**: Data is stored in sorted order
+- **Multi-way**: Each node can have multiple children (not just 2)
+- **Efficient**: O(log n) time complexity for all operations
+- **Range queries**: Excellent for range-based searches
+
+## B-tree Structure
+
+### Node Structure
+
+Each B-tree node contains:
+- **Keys**: Sorted array of values
+- **Pointers**: References to child nodes or data records
+- **Leaf flag**: Indicates if node is a leaf or internal node
+
+```
+Internal Node:
+[Key1] [Key2] [Key3]
+  |     |     |     |
+Child1 Child2 Child3 Child4
+
+Leaf Node:
+[Key1] [Key2] [Key3] -> [Data1] [Data2] [Data3]
 ```
 
+### B-tree Properties
+
+For a B-tree of order `m`:
+- **Root node**: Can have 1 to `m` children
+- **Internal nodes**: Can have `⌈m/2⌉` to `m` children
+- **Leaf nodes**: Can contain `⌈m/2⌉-1` to `m-1` keys
+- **All leaves**: At the same depth
+
+## Step-by-Step B-tree Operations
+
+### 1. B-tree Search Algorithm
+
+**Goal**: Find a key in the B-tree
+
+**Steps**:
+1. Start at the root node
+2. Compare the search key with keys in current node
+3. If key is found, return the data
+4. If key is not found, determine which child to traverse
+5. Recursively search in the appropriate child
+6. Continue until key is found or reach a leaf
+
+**Example**:
+```
+Search for key "M" in B-tree:
+
+Root: [G, P]
+       |  |
+    [A,C,E] [M,N,R]
+
+1. Compare "M" with root keys [G, P]
+2. "M" > "G" and "M" < "P", so go to middle child
+3. Compare "M" with [M, N, R]
+4. "M" == "M", found!
+```
+
+### 2. B-tree Insertion Algorithm
+
+**Goal**: Insert a new key while maintaining B-tree properties
+
+**Steps**:
+1. Search for the appropriate leaf node
+2. Insert the key in sorted order
+3. If leaf is not full, insertion complete
+4. If leaf is full, split the node:
+   - Create new node
+   - Move half keys to new node
+   - Promote middle key to parent
+   - Update parent pointers
+5. If parent becomes full, repeat splitting process
+6. If root splits, create new root
+
+**Example**:
+```
+Insert "Q" into B-tree:
+
+Before: Root [G, P]
+              |  |
+        [A,C,E] [M,N,R]
+
+1. Find leaf: [M,N,R]
+2. Insert "Q": [M,N,Q,R] (now full)
+3. Split leaf: [M,N] and [Q,R]
+4. Promote "Q" to parent
+5. Update parent: [G,P,Q]
+6. Update pointers
+
+After: Root [G, P, Q]
+            |  |  |
+    [A,C,E] [M,N] [Q,R]
+```
+
+### 3. B-tree Deletion Algorithm
+
+**Goal**: Remove a key while maintaining B-tree properties
+
+**Steps**:
+1. Search for the key to delete
+2. If key is in leaf:
+   - Simply remove it
+   - If leaf becomes under-full, borrow from sibling or merge
+3. If key is in internal node:
+   - Replace with predecessor/successor from leaf
+   - Delete the predecessor/successor
+4. Handle under-full nodes by borrowing or merging
+5. Propagate changes up the tree
+
+**Example**:
+```
+Delete "M" from B-tree:
+
+Before: Root [G, P, Q]
+            |  |  |
+    [A,C,E] [M,N] [Q,R]
+
+1. "M" is in leaf [M,N]
+2. Remove "M": [N] (now under-full)
+3. Borrow from sibling [Q,R]: [N,Q] and [R]
+4. Update parent: [G,P] (no longer needs Q)
+5. Merge with left sibling: [G] and [P]
+
+After: Root [G, P]
+            |  |
+    [A,C,E] [N,Q,R]
+```
+
+## HaruDB B-tree Implementation
+
+### Creating B-tree Indexes
+
+```sql
+-- Create B-tree index on single column
+CREATE INDEX ON users (email);
+
+-- Create B-tree index on multiple columns (composite)
+CREATE INDEX ON orders (customer_id, order_date);
+
+-- Create B-tree index on numeric column
+CREATE INDEX ON products (price);
+```
+
+### B-tree Index Properties in HaruDB
+
+- **Order**: Default order of 3 (can be configured)
+- **Persistence**: Index metadata saved to disk
+- **Rebuilding**: Indexes rebuilt on server startup
+- **Memory**: Indexes stored in memory for fast access
+- **Balancing**: Automatic rebalancing on insertions/deletions
+
+## Query Optimization with B-trees
+
+### Equality Queries
+
+B-trees excel at equality searches:
+
+```sql
+-- Uses B-tree index efficiently
+SELECT * FROM users WHERE email = 'alice@example.com';
+
+-- Composite index usage
+SELECT * FROM orders WHERE customer_id = '123' AND order_date = '2024-01-15';
+```
+
+**Performance**: O(log n) time complexity
+
+### Range Queries
+
+B-trees are excellent for range queries:
+
+```sql
+-- Range queries use B-tree efficiently
+SELECT * FROM products WHERE price BETWEEN 100 AND 500;
+
+-- Greater than queries
+SELECT * FROM users WHERE created_at > '2024-01-01';
+
+-- Less than queries
+SELECT * FROM orders WHERE total < 1000;
+```
+
+**Performance**: O(log n + k) where k is result set size
+
+### Ordered Queries
+
+B-trees maintain sorted order:
+
+```sql
+-- Ordered results (no additional sorting needed)
+SELECT * FROM products ORDER BY price;
+
+-- Reverse order
+SELECT * FROM users ORDER BY created_at DESC;
+```
+
+**Performance**: O(log n + k) for ordered traversal
+
+## B-tree vs Other Index Types
+
+### B-tree vs Hash Index
+
+| Feature | B-tree | Hash Index |
+|---------|--------|------------|
+| **Equality queries** | O(log n) | O(1) |
+| **Range queries** | O(log n + k) | Not supported |
+| **Ordered queries** | O(log n + k) | Not supported |
+| **Memory usage** | Moderate | Low |
+| **Maintenance** | Automatic | Simple |
+
+### B-tree vs Binary Search Tree
+
+| Feature | B-tree | Binary Tree |
+|---------|--------|-------------|
+| **Height** | O(log n) | O(log n) worst case |
+| **Balancing** | Automatic | Manual (AVL/Red-Black) |
+| **Node size** | Multiple keys | Single key |
+| **Cache efficiency** | Better | Poor |
+| **Range queries** | Excellent | Good |
+
+## Advanced B-tree Concepts
+
+### B-tree Order and Performance
+
+**Order 3 B-tree** (2-3 tree):
+- Each node has 1-2 keys
+- Each node has 2-3 children
+- Good for small datasets
+
+**Order 5 B-tree**:
+- Each node has 2-4 keys
+- Each node has 3-5 children
+- Better for larger datasets
+
+**Order 7 B-tree**:
+- Each node has 3-6 keys
+- Each node has 4-7 children
+- Optimal for very large datasets
+
+### B-tree Splitting Strategy
+
+```sql
+-- Example of B-tree splitting during insertion
+-- Order 3 B-tree (2-3 tree)
+
+Before insertion:
+Root: [50]
+       |
+    [20, 30] [70, 80]
+
+Insert 25:
+1. Find leaf: [20, 30]
+2. Insert 25: [20, 25, 30] (now full)
+3. Split: [20] and [25, 30]
+4. Promote 25 to parent
+5. New root: [25, 50]
+6. Update pointers
+
+After insertion:
+Root: [25, 50]
+       |   |
+    [20] [30] [70, 80]
+```
+
+### B-tree Merging Strategy
+
+```sql
+-- Example of B-tree merging during deletion
+-- Order 3 B-tree (2-3 tree)
+
+Before deletion:
+Root: [25, 50]
+       |   |
+    [20] [30] [70, 80]
+
+Delete 20:
+1. Remove 20 from leaf [20]
+2. Leaf becomes empty
+3. Merge with right sibling [30]
+4. New leaf: [30]
+5. Remove 25 from parent
+6. Parent becomes [50]
+
+After deletion:
+Root: [50]
+       |
+    [30] [70, 80]
+```
+
+## Performance Optimization
+
+### Index Selection Strategy
+
+1. **Primary keys**: Always indexed automatically
+2. **Foreign keys**: Index for join performance
+3. **Frequently queried columns**: Create indexes
+4. **Range query columns**: B-tree indexes are ideal
+5. **Composite indexes**: For multi-column queries
+
+### Index Maintenance
+
+```sql
+-- Check index usage (if supported)
+EXPLAIN SELECT * FROM users WHERE email = 'alice@example.com';
+
+-- Rebuild indexes (if needed)
+-- HaruDB automatically rebuilds indexes on startup
+
+-- Monitor index performance
+-- Use query timing to measure improvement
+```
+
+### Best Practices
+
+1. **Create indexes on frequently queried columns**
+2. **Use composite indexes for multi-column queries**
+3. **Avoid over-indexing** (too many indexes slow down writes)
+4. **Monitor query performance** after index creation
+5. **Consider index order** based on query patterns
+
+## Complete B-tree Example
+
+### Database Schema
+
+```sql
+-- Create tables
+CREATE TABLE customers (id, name, email, created_at);
+CREATE TABLE orders (id, customer_id, product_id, quantity, total, order_date);
+CREATE TABLE products (id, name, price, category);
+
+-- Insert sample data
+INSERT INTO customers VALUES (1, 'Alice', 'alice@example.com', '2024-01-01');
+INSERT INTO customers VALUES (2, 'Bob', 'bob@example.com', '2024-01-02');
+INSERT INTO customers VALUES (3, 'Charlie', 'charlie@example.com', '2024-01-03');
+
+INSERT INTO products VALUES (1, 'Laptop', '999.99', 'Electronics');
+INSERT INTO products VALUES (2, 'Mouse', '29.99', 'Electronics');
+INSERT INTO products VALUES (3, 'Keyboard', '79.99', 'Electronics');
+
+INSERT INTO orders VALUES (1, 1, 1, 1, '999.99', '2024-01-15');
+INSERT INTO orders VALUES (2, 1, 2, 2, '59.98', '2024-01-15');
+INSERT INTO orders VALUES (3, 2, 3, 1, '79.99', '2024-01-16');
+```
+
+### B-tree Index Creation
+
+```sql
+-- Create B-tree indexes
+CREATE INDEX ON customers (email);
+CREATE INDEX ON customers (created_at);
+CREATE INDEX ON orders (customer_id);
+CREATE INDEX ON orders (order_date);
+CREATE INDEX ON products (price);
+CREATE INDEX ON products (category);
+
+-- Composite B-tree index
+CREATE INDEX ON orders (customer_id, order_date);
+```
+
+### Query Examples with B-tree Optimization
+
+```sql
+-- Equality query (uses email index)
+SELECT * FROM customers WHERE email = 'alice@example.com';
+
+-- Range query (uses created_at index)
+SELECT * FROM customers WHERE created_at BETWEEN '2024-01-01' AND '2024-01-02';
+
+-- Range query (uses price index)
+SELECT * FROM products WHERE price > 50 AND price < 200;
+
+-- Composite query (uses composite index)
+SELECT * FROM orders WHERE customer_id = '1' AND order_date = '2024-01-15';
+
+-- Ordered query (uses price index for sorting)
+SELECT * FROM products ORDER BY price;
+
+-- Complex query with multiple indexes
+SELECT c.name, o.total, p.name 
+FROM customers c, orders o, products p
+WHERE c.id = o.customer_id 
+  AND o.product_id = p.id 
+  AND c.email = 'alice@example.com'
+  AND o.order_date > '2024-01-01';
+```
+
+## B-tree Visualization
+
+### Visual Representation
+
+```
+B-tree of order 3 (2-3 tree):
+
+                    [50]
+                   /    \
+              [20, 30]  [70, 80]
+              /  |  \   /  |  \
+           [10] [25] [35] [60] [75] [90]
+
+Key properties:
+- All leaves at same level
+- Each internal node has 1-2 keys
+- Each internal node has 2-3 children
+- Keys are sorted within each node
+```
+
+### Insertion Visualization
+
+```
+Step 1: Insert 15
+                    [50]
+                   /    \
+              [20, 30]  [70, 80]
+              /  |  \   /  |  \
+           [10,15] [25] [35] [60] [75] [90]
+
+Step 2: Insert 5 (causes split)
+                    [50]
+                   /    \
+              [15, 30]  [70, 80]
+              /  |  \   /  |  \
+           [5,10] [20,25] [35] [60] [75] [90]
+```
+
+## Troubleshooting B-tree Indexes
+
+### Common Issues
+
+1. **Index not being used**:
+   - Check query syntax
+   - Verify index exists
+   - Ensure proper WHERE clause
+
+2. **Slow index performance**:
+   - Check B-tree order
+   - Monitor memory usage
+   - Consider index rebuilding
+
+3. **Index maintenance overhead**:
+   - Balance read vs write performance
+   - Monitor index size
+   - Consider index consolidation
+
+### Performance Monitoring
+
+```sql
+-- Monitor query performance
+-- Before index creation
+SELECT * FROM users WHERE email = 'alice@example.com';
+-- Note: execution time
+
+-- After index creation
+CREATE INDEX ON users (email);
+SELECT * FROM users WHERE email = 'alice@example.com';
+-- Note: improved execution time
+```
+
+For more information about HaruDB's storage engine and WAL implementation, see the [Storage Engine documentation](/reference/storage/) and [WAL documentation](/reference/wal/).
