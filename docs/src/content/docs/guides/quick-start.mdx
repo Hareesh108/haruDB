@@ -3,49 +3,255 @@ title: Quick Start
 description: Start the HaruDB server and run your first queries in minutes.
 ---
 
-## Start the Server
+## Prerequisites
+
+Before you begin, ensure you have:
+- **Linux** or **macOS** system
+- **Docker** (optional, for containerized deployment)
+- **Telnet** or **netcat** for basic connection testing
+
+## Installation
+
+### Option 1: Native Installation (Recommended)
 
 ```bash
-# Using the binary
-./harudb --data-dir ./data
+# Install HaruDB
+curl -sSL https://raw.githubusercontent.com/Hareesh108/haruDB/main/scripts/install-harudb.sh | bash
 
-# Or using Docker
+# Verify installation
+harudb --version
+```
+
+### Option 2: Docker Installation
+
+```bash
+# Pull the latest image
+docker pull hareesh108/harudb:latest
+
+# Run the container
 docker run -p 54321:54321 hareesh108/harudb:latest
 ```
 
-## Connect
+## Start the Server
+
+### Native Binary
 
 ```bash
-# Telnet
-telnet localhost 54321
+# Basic startup
+./harudb --data-dir ./data
 
-# Or netcat
+# With TLS encryption
+./harudb --data-dir ./data --tls
+
+# Custom port
+./harudb --data-dir ./data --port 54322
+```
+
+### Docker
+
+```bash
+# Run with volume mounting for persistence
+docker run -p 54321:54321 -v $(pwd)/data:/app/data hareesh108/harudb:latest
+
+# Run in background
+docker run -d -p 54321:54321 --name harudb hareesh108/harudb:latest
+```
+
+## Connect to HaruDB
+
+### Using Telnet (Basic)
+
+```bash
+telnet localhost 54321
+```
+
+### Using Netcat
+
+```bash
 nc localhost 54321
 ```
 
-## Basic Operations
+### Using HaruDB CLI (Recommended)
+
+```bash
+haru-cli
+```
+
+You should see:
+```
+Welcome to HaruDB v0.0.4 🎉
+Type 'exit' to quit.
+
+haruDB>
+```
+
+## Your First Database Operations
+
+### 1. Create a Table
 
 ```sql
--- Create a table
-CREATE TABLE products (id, name, price);
-
--- Insert data
-INSERT INTO products VALUES (1, 'Laptop', '999.99');
-INSERT INTO products VALUES (2, 'Mouse', '29.99');
-
--- Query data
-SELECT * FROM products;
-
--- Create an index and run indexed queries
-CREATE INDEX ON products (name);
-SELECT * FROM products WHERE name = 'Laptop';
-
--- Update data
-UPDATE products SET price = '1099.99' ROW 0;
-
--- Delete data
-DELETE FROM products ROW 1;
-
--- Drop table
-DROP TABLE products;
+CREATE TABLE users (id, name, email, age);
 ```
+
+### 2. Insert Data
+
+```sql
+INSERT INTO users VALUES (1, 'Alice', 'alice@example.com', '25');
+INSERT INTO users VALUES (2, 'Bob', 'bob@example.com', '30');
+INSERT INTO users VALUES (3, 'Charlie', 'charlie@example.com', '35');
+```
+
+### 3. Query Data
+
+```sql
+-- Select all users
+SELECT * FROM users;
+
+-- Select specific columns
+SELECT name, email FROM users;
+
+-- Count records
+SELECT COUNT(*) FROM users;
+```
+
+### 4. Create an Index for Faster Queries
+
+```sql
+CREATE INDEX ON users (email);
+```
+
+### 5. Advanced Queries with WHERE Clauses
+
+```sql
+-- Equality filter (uses index)
+SELECT * FROM users WHERE email = 'alice@example.com';
+
+-- Comparison operators
+SELECT * FROM users WHERE age > 30;
+
+-- Pattern matching
+SELECT * FROM users WHERE name LIKE 'A%';
+
+-- Complex conditions
+SELECT * FROM users WHERE age > 25 AND name LIKE 'A%';
+```
+
+### 6. Update Data
+
+```sql
+-- Update by row index
+UPDATE users SET age = '26' ROW 0;
+
+-- Update multiple columns
+UPDATE users SET name = 'Alice Updated', email = 'alice.updated@example.com' ROW 0;
+```
+
+### 7. Delete Data
+
+```sql
+-- Delete by row index
+DELETE FROM users ROW 2;
+```
+
+### 8. Transactions
+
+```sql
+-- Begin a transaction
+BEGIN TRANSACTION;
+
+-- Make multiple changes
+INSERT INTO users VALUES (4, 'David', 'david@example.com', '28');
+UPDATE users SET age = '27' ROW 0;
+
+-- Commit the transaction
+COMMIT;
+
+-- Or rollback if needed
+BEGIN TRANSACTION;
+INSERT INTO users VALUES (5, 'Eve', 'eve@example.com', '32');
+ROLLBACK; -- This will undo the insert
+```
+
+### 9. Clean Up
+
+```sql
+-- Drop the table
+DROP TABLE users;
+```
+
+## Complete Example Session
+
+Here's a complete session demonstrating HaruDB's capabilities:
+
+```sql
+-- Create tables
+CREATE TABLE products (id, name, price, category);
+CREATE TABLE orders (id, product_id, quantity, total);
+
+-- Insert sample data
+INSERT INTO products VALUES (1, 'Laptop', '999.99', 'Electronics');
+INSERT INTO products VALUES (2, 'Mouse', '29.99', 'Electronics');
+INSERT INTO products VALUES (3, 'Desk', '199.99', 'Furniture');
+
+-- Create indexes
+CREATE INDEX ON products (category);
+CREATE INDEX ON products (name);
+
+-- Query with WHERE clauses
+SELECT * FROM products WHERE category = 'Electronics';
+SELECT * FROM products WHERE price > 100;
+
+-- Complex query
+SELECT * FROM products WHERE category = 'Electronics' AND price < 50;
+
+-- Transaction example
+BEGIN TRANSACTION;
+INSERT INTO orders VALUES (1, 1, 2, '1999.98');
+INSERT INTO orders VALUES (2, 2, 1, '29.99');
+COMMIT;
+
+-- Verify transaction
+SELECT * FROM orders;
+
+-- Clean up
+DROP TABLE products;
+DROP TABLE orders;
+```
+
+## Next Steps
+
+Now that you've completed the quick start:
+
+1. **Explore SQL Operations** - Learn about [advanced SQL features](/guides/sql-operations/)
+2. **Understand Transactions** - Dive into [ACID compliance](/guides/transactions/)
+3. **Optimize Performance** - Learn about [indexes and query optimization](/guides/indexes/)
+4. **Secure Your Database** - Set up [authentication and user management](/guides/authentication/)
+5. **Backup Your Data** - Learn about [backup and restore](/guides/backup-restore/)
+
+## Troubleshooting
+
+### Common Issues
+
+**Port already in use:**
+```bash
+# Kill existing process
+pkill harudb
+# Or use a different port
+./harudb --port 54322
+```
+
+**Permission denied:**
+```bash
+# Make binary executable
+chmod +x harudb
+```
+
+**Connection refused:**
+```bash
+# Check if server is running
+ps aux | grep harudb
+# Check port availability
+netstat -tlnp | grep 54321
+```
+
+For more troubleshooting help, see the [Troubleshooting Guide](/guides/troubleshooting/).

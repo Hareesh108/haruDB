@@ -16,15 +16,30 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', slug: 'index' },
 						{ label: 'Quick Start', slug: 'guides/quick-start' },
+						{ label: 'Installation', slug: 'guides/installation' },
 					],
 				},
 				{
-					label: 'Features',
+					label: 'Core Features',
 					items: [
 						{ label: 'SQL Operations', slug: 'guides/sql-operations' },
 						{ label: 'Indexes & Optimization', slug: 'guides/indexes' },
 						{ label: 'Transactions & ACID', slug: 'guides/transactions' },
 						{ label: 'Data Integrity & Recovery', slug: 'guides/data-integrity' },
+					],
+				},
+				{
+					label: 'Security & Management',
+					items: [
+						{ label: 'Authentication & Users', slug: 'guides/authentication' },
+						{ label: 'Backup & Restore', slug: 'guides/backup-restore' },
+					],
+				},
+				{
+					label: 'Deployment',
+					items: [
+						{ label: 'Docker', slug: 'guides/docker' },
+						{ label: 'Connect', slug: 'guides/connect' },
 					],
 				},
 				{
@@ -36,17 +51,11 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Guides',
+					label: 'Support',
 					items: [
-						{ label: 'Installation', slug: 'guides/installation' },
-						{ label: 'Docker', slug: 'guides/docker' },
-						{ label: 'Connect', slug: 'guides/connect' },
 						{ label: 'Troubleshooting', slug: 'guides/troubleshooting' },
+						{ label: 'Roadmap', slug: 'reference/roadmap' },
 					],
-				},
-				{
-					label: 'Roadmap',
-					items: [{ label: 'Planned Features', slug: 'reference/roadmap' }],
 				},
 				{
 					label: 'About',

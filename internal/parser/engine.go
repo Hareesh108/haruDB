@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Hareesh108/haruDB/internal/auth"
 	"github.com/Hareesh108/haruDB/internal/storage"
 )
 
@@ -14,11 +16,18 @@ const (
 )
 
 type Engine struct {
-	DB *storage.Database
+	DB             *storage.Database
+	UserManager    *auth.UserManager
+	BackupManager  *storage.BackupManager
+	CurrentSession *auth.Session
 }
 
 func NewEngine(dataDir string) *Engine {
-	return &Engine{DB: storage.NewDatabase(dataDir)}
+	return &Engine{
+		DB:            storage.NewDatabase(dataDir),
+		UserManager:   auth.NewUserManager(dataDir),
+		BackupManager: storage.NewBackupManager(dataDir),
+	}
 }
 
 func (e *Engine) Execute(input string) string {
@@ -251,6 +260,42 @@ func (e *Engine) Execute(input string) string {
 		tableName := strings.ToLower(parts[2])
 		return e.DB.DropTableTx(tableName)
 
+	case strings.HasPrefix(upper, "LOGIN"):
+		// LOGIN username password
+		return e.handleLogin(input)
+
+	case strings.HasPrefix(upper, "LOGOUT"):
+		// LOGOUT
+		return e.handleLogout()
+
+	case strings.HasPrefix(upper, "CREATE USER"):
+		// CREATE USER username password [role]
+		return e.handleCreateUser(input)
+
+	case strings.HasPrefix(upper, "DROP USER"):
+		// DROP USER username
+		return e.handleDropUser(input)
+
+	case strings.HasPrefix(upper, "LIST USERS"):
+		// LIST USERS
+		return e.handleListUsers()
+
+	case strings.HasPrefix(upper, "BACKUP"):
+		// BACKUP [TO path] [DESCRIPTION description]
+		return e.handleBackup(input)
+
+	case strings.HasPrefix(upper, "RESTORE"):
+		// RESTORE FROM path
+		return e.handleRestore(input)
+
+	case strings.HasPrefix(upper, "BACKUP INFO"):
+		// BACKUP INFO path
+		return e.handleBackupInfo(input)
+
+	case strings.HasPrefix(upper, "LIST BACKUPS"):
+		// LIST BACKUPS [directory]
+		return e.handleListBackups(input)
+
 	default:
 		return "Unknown command"
 	}
@@ -347,4 +392,238 @@ func (e *Engine) handleSavepoint(input string) string {
 		return fmt.Sprintf("Failed to create savepoint %s: %v", savepointName, err)
 	}
 	return fmt.Sprintf("Savepoint %s created", savepointName)
+}
+
+// Authentication handler methods
+
+// handleLogin handles LOGIN commands
+func (e *Engine) handleLogin(input string) string {
+	parts := strings.Fields(input)
+	if len(parts) < 3 {
+		return "Syntax error: LOGIN username password"
+	}
+
+	username := parts[1]
+	password := parts[2]
+
+	user, err := e.UserManager.AuthenticateUser(username, password)
+	if err != nil {
+		return fmt.Sprintf("Login failed: %v", err)
+	}
+
+	session, err := e.UserManager.CreateSession(user)
+	if err != nil {
+		return fmt.Sprintf("Failed to create session: %v", err)
+	}
+
+	e.CurrentSession = session
+	return fmt.Sprintf("Login successful. Welcome, %s!", username)
+}
+
+// handleLogout handles LOGOUT commands
+func (e *Engine) handleLogout() string {
+	if e.CurrentSession == nil {
+		return "No active session"
+	}
+
+	err := e.UserManager.LogoutSession(e.CurrentSession.SessionID)
+	if err != nil {
+		return fmt.Sprintf("Logout failed: %v", err)
+	}
+
+	e.CurrentSession = nil
+	return "Logout successful"
+}
+
+// handleCreateUser handles CREATE USER commands
+func (e *Engine) handleCreateUser(input string) string {
+	if e.CurrentSession == nil || e.CurrentSession.Role != auth.RoleAdmin {
+		return "Access denied: Admin privileges required"
+	}
+
+	parts := strings.Fields(input)
+	if len(parts) < 4 {
+		return "Syntax error: CREATE USER username password [role]"
+	}
+
+	username := parts[2]
+	password := parts[3]
+	role := auth.RoleUser
+
+	// Parse role if specified
+	if len(parts) >= 5 {
+		switch strings.ToUpper(parts[4]) {
+		case "ADMIN":
+			role = auth.RoleAdmin
+		case "USER":
+			role = auth.RoleUser
+		case "READONLY":
+			role = auth.RoleReadOnly
+		default:
+			return "Invalid role. Use: ADMIN, USER, or READONLY"
+		}
+	}
+
+	err := e.UserManager.CreateUser(username, password, role)
+	if err != nil {
+		return fmt.Sprintf("Failed to create user: %v", err)
+	}
+
+	return fmt.Sprintf("User %s created successfully", username)
+}
+
+// handleDropUser handles DROP USER commands
+func (e *Engine) handleDropUser(input string) string {
+	if e.CurrentSession == nil || e.CurrentSession.Role != auth.RoleAdmin {
+		return "Access denied: Admin privileges required"
+	}
+
+	parts := strings.Fields(input)
+	if len(parts) < 3 {
+		return "Syntax error: DROP USER username"
+	}
+
+	username := parts[2]
+	err := e.UserManager.DeleteUser(username)
+	if err != nil {
+		return fmt.Sprintf("Failed to delete user: %v", err)
+	}
+
+	return fmt.Sprintf("User %s deleted successfully", username)
+}
+
+// handleListUsers handles LIST USERS commands
+func (e *Engine) handleListUsers() string {
+	if e.CurrentSession == nil || e.CurrentSession.Role != auth.RoleAdmin {
+		return "Access denied: Admin privileges required"
+	}
+
+	users := e.UserManager.ListUsers()
+	if len(users) == 0 {
+		return "No users found"
+	}
+
+	result := "Users:\n"
+	for _, user := range users {
+		roleStr := "USER"
+		switch user.Role {
+		case auth.RoleAdmin:
+			roleStr = "ADMIN"
+		case auth.RoleReadOnly:
+			roleStr = "READONLY"
+		}
+		result += fmt.Sprintf("- %s (%s) - Created: %s, Last Login: %s\n",
+			user.Username, roleStr, user.CreatedAt.Format("2006-01-02 15:04:05"),
+			user.LastLogin.Format("2006-01-02 15:04:05"))
+	}
+
+	return result
+}
+
+// Backup handler methods
+
+// handleBackup handles BACKUP commands
+func (e *Engine) handleBackup(input string) string {
+	if e.CurrentSession == nil || e.CurrentSession.Role == auth.RoleReadOnly {
+		return "Access denied: Write privileges required"
+	}
+
+	parts := strings.Fields(input)
+	if len(parts) < 2 {
+		return "Syntax error: BACKUP [TO path] [DESCRIPTION description]"
+	}
+
+	// Default backup path
+	backupPath := fmt.Sprintf("./backups/harudb_backup_%s.backup", time.Now().Format("20060102_150405"))
+	description := "Manual backup"
+
+	// Parse optional parameters
+	for i := 1; i < len(parts); i++ {
+		if strings.ToUpper(parts[i]) == "TO" && i+1 < len(parts) {
+			backupPath = parts[i+1]
+			i++
+		} else if strings.ToUpper(parts[i]) == "DESCRIPTION" && i+1 < len(parts) {
+			description = parts[i+1]
+			i++
+		}
+	}
+
+	err := e.BackupManager.CreateBackup(backupPath, description)
+	if err != nil {
+		return fmt.Sprintf("Backup failed: %v", err)
+	}
+
+	return fmt.Sprintf("Backup created successfully: %s", backupPath)
+}
+
+// handleRestore handles RESTORE commands
+func (e *Engine) handleRestore(input string) string {
+	if e.CurrentSession == nil || e.CurrentSession.Role != auth.RoleAdmin {
+		return "Access denied: Admin privileges required"
+	}
+
+	parts := strings.Fields(input)
+	if len(parts) < 3 || strings.ToUpper(parts[1]) != "FROM" {
+		return "Syntax error: RESTORE FROM path"
+	}
+
+	backupPath := parts[2]
+	err := e.BackupManager.RestoreBackup(backupPath)
+	if err != nil {
+		return fmt.Sprintf("Restore failed: %v", err)
+	}
+
+	return fmt.Sprintf("Database restored successfully from: %s", backupPath)
+}
+
+// handleBackupInfo handles BACKUP INFO commands
+func (e *Engine) handleBackupInfo(input string) string {
+	parts := strings.Fields(input)
+	if len(parts) < 3 {
+		return "Syntax error: BACKUP INFO path"
+	}
+
+	backupPath := parts[2]
+	info, err := e.BackupManager.GetBackupInfo(backupPath)
+	if err != nil {
+		return fmt.Sprintf("Failed to get backup info: %v", err)
+	}
+
+	return fmt.Sprintf("Backup Info:\n"+
+		"Timestamp: %s\n"+
+		"Version: %s\n"+
+		"Table Count: %d\n"+
+		"Backup Size: %d bytes\n"+
+		"Description: %s",
+		info.Timestamp.Format("2006-01-02 15:04:05"),
+		info.Version,
+		info.TableCount,
+		info.BackupSize,
+		info.Description)
+}
+
+// handleListBackups handles LIST BACKUPS commands
+func (e *Engine) handleListBackups(input string) string {
+	parts := strings.Fields(input)
+	backupDir := "./backups"
+
+	if len(parts) >= 3 {
+		backupDir = parts[2]
+	}
+
+	backups, err := e.BackupManager.ListBackups(backupDir)
+	if err != nil {
+		return fmt.Sprintf("Failed to list backups: %v", err)
+	}
+
+	if len(backups) == 0 {
+		return "No backups found"
+	}
+
+	result := "Available backups:\n"
+	for _, backup := range backups {
+		result += fmt.Sprintf("- %s\n", backup)
+	}
+
+	return result
 }
