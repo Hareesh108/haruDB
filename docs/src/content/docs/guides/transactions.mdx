@@ -1,38 +1,438 @@
 ---
 title: Transactions & ACID
-description: Use BEGIN, COMMIT, ROLLBACK, savepoints, and isolation levels.
+description: Complete guide to ACID transactions, savepoints, isolation levels, and transaction management in HaruDB.
 ---
 
-HaruDB supports ACID transactions with WAL integration.
+## What are ACID Transactions?
 
-## Basics
+ACID transactions ensure data integrity and consistency in HaruDB:
+
+- **Atomicity**: All operations in a transaction succeed or all fail
+- **Consistency**: Database remains in a valid state before and after transactions
+- **Isolation**: Concurrent transactions don't interfere with each other
+- **Durability**: Committed changes persist even after system crashes
+
+## Basic Transaction Commands
+
+### BEGIN TRANSACTION
+
+Start a new transaction. All subsequent operations will be part of this transaction until committed or rolled back.
 
 ```sql
+-- Start a transaction
 BEGIN TRANSACTION;
+
+-- Or use the shorter form
+BEGIN;
+```
+
+### COMMIT
+
+Commit all changes made within the current transaction, making them permanent.
+
+```sql
+-- Commit the transaction
 COMMIT;
+```
+
+### ROLLBACK
+
+Undo all changes made within the current transaction, returning the database to its state before the transaction began.
+
+```sql
+-- Rollback the transaction
 ROLLBACK;
+```
+
+## Complete Transaction Example
+
+```sql
+-- Create sample tables
+CREATE TABLE accounts (id, name, balance);
+CREATE TABLE transactions (id, from_account, to_account, amount, timestamp);
+
+-- Insert initial data
+INSERT INTO accounts VALUES (1, 'Alice', '1000');
+INSERT INTO accounts VALUES (2, 'Bob', '500');
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Transfer money from Alice to Bob
+UPDATE accounts SET balance = '900' ROW 0;  -- Alice: 1000 -> 900
+UPDATE accounts SET balance = '600' ROW 1;  -- Bob: 500 -> 600
+
+-- Record the transaction
+INSERT INTO transactions VALUES (1, 1, 2, '100', '2024-01-15 10:30:00');
+
+-- Commit the transaction
+COMMIT;
+
+-- Verify the changes
+SELECT * FROM accounts;
+SELECT * FROM transactions;
 ```
 
 ## Savepoints
 
+Savepoints allow you to create intermediate checkpoints within a transaction, enabling partial rollbacks.
+
+### SAVEPOINT
+
+Create a named savepoint within the current transaction.
+
 ```sql
+SAVEPOINT savepoint_name;
+```
+
+### ROLLBACK TO SAVEPOINT
+
+Rollback to a specific savepoint, undoing all changes made after that savepoint.
+
+```sql
+ROLLBACK TO SAVEPOINT savepoint_name;
+```
+
+### Savepoint Example
+
+```sql
+-- Create table
+CREATE TABLE orders (id, customer_id, product_id, quantity, total);
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Insert first order
+INSERT INTO orders VALUES (1, 1, 1, 2, '199.98');
 SAVEPOINT sp1;
+
+-- Insert second order
+INSERT INTO orders VALUES (2, 1, 2, 1, '29.99');
+SAVEPOINT sp2;
+
+-- Insert third order
+INSERT INTO orders VALUES (3, 2, 1, 1, '99.99');
+
+-- Check current state
+SELECT * FROM orders;
+
+-- Rollback to second savepoint (undoes third order)
+ROLLBACK TO SAVEPOINT sp2;
+SELECT * FROM orders;
+
+-- Rollback to first savepoint (undoes second and third orders)
 ROLLBACK TO SAVEPOINT sp1;
+SELECT * FROM orders;
+
+-- Commit remaining changes
+COMMIT;
 ```
 
 ## Isolation Levels
 
+HaruDB supports different isolation levels to control how transactions interact with each other.
+
+### READ COMMITTED
+
+Default isolation level. Allows reading committed data from other transactions.
+
 ```sql
 BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
-BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-```
-
-## Example
-
-```sql
-BEGIN TRANSACTION;
-INSERT INTO orders VALUES (1, 1, 'Laptop', '1', '999.99');
-UPDATE inventory SET stock = '9' ROW 0;
+-- Transaction operations
 COMMIT;
 ```
+
+### REPEATABLE READ
+
+Ensures that repeated reads within the same transaction return the same data.
+
+```sql
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+-- Transaction operations
+COMMIT;
+```
+
+### SERIALIZABLE
+
+Highest isolation level. Ensures complete isolation from other transactions.
+
+```sql
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- Transaction operations
+COMMIT;
+```
+
+### Isolation Level Example
+
+```sql
+-- Create table
+CREATE TABLE inventory (id, product_name, stock);
+
+-- Insert data
+INSERT INTO inventory VALUES (1, 'Laptop', '10');
+INSERT INTO inventory VALUES (2, 'Mouse', '50');
+
+-- Transaction 1 (Serializable)
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+SELECT * FROM inventory WHERE product_name = 'Laptop';
+-- Process order...
+UPDATE inventory SET stock = '9' ROW 0;
+COMMIT;
+
+-- Transaction 2 (Read Committed)
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SELECT * FROM inventory WHERE product_name = 'Laptop';
+-- Process another order...
+UPDATE inventory SET stock = '8' ROW 0;
+COMMIT;
+```
+
+## Multi-Table Transactions
+
+Transactions can span multiple tables, ensuring data consistency across related operations.
+
+### E-commerce Example
+
+```sql
+-- Create tables
+CREATE TABLE customers (id, name, email, balance);
+CREATE TABLE products (id, name, price, stock);
+CREATE TABLE orders (id, customer_id, product_id, quantity, total, order_date);
+CREATE TABLE order_items (id, order_id, product_id, quantity, price);
+
+-- Insert sample data
+INSERT INTO customers VALUES (1, 'Alice', 'alice@example.com', '1000');
+INSERT INTO products VALUES (1, 'Laptop', '999.99', '5');
+INSERT INTO products VALUES (2, 'Mouse', '29.99', '20');
+
+-- Multi-table transaction
+BEGIN TRANSACTION;
+
+-- Create order
+INSERT INTO orders VALUES (1, 1, 1, 1, '999.99', '2024-01-15');
+INSERT INTO order_items VALUES (1, 1, 1, 1, '999.99');
+
+-- Update inventory
+UPDATE products SET stock = '4' ROW 0;
+
+-- Update customer balance
+UPDATE customers SET balance = '0.01' ROW 0;
+
+-- Commit all changes
+COMMIT;
+
+-- Verify consistency
+SELECT * FROM customers;
+SELECT * FROM products;
+SELECT * FROM orders;
+SELECT * FROM order_items;
+```
+
+## Error Handling in Transactions
+
+HaruDB provides robust error handling within transactions, allowing you to gracefully handle failures.
+
+### Error Handling Example
+
+```sql
+-- Create table
+CREATE TABLE users (id, name, email, age);
+
+-- Insert valid data
+INSERT INTO users VALUES (1, 'Alice', 'alice@example.com', '25');
+
+-- Transaction with error handling
+BEGIN TRANSACTION;
+
+-- Valid operation
+INSERT INTO users VALUES (2, 'Bob', 'bob@example.com', '30');
+
+-- This will fail (invalid row index)
+UPDATE users SET age = '31' ROW 10;
+
+-- Check if we should rollback
+-- In a real application, you'd check the error and decide
+ROLLBACK;
+
+-- Verify rollback worked
+SELECT * FROM users;
+```
+
+### Conditional Transaction Logic
+
+```sql
+-- Create table
+CREATE TABLE accounts (id, name, balance);
+
+-- Insert data
+INSERT INTO accounts VALUES (1, 'Alice', '1000');
+INSERT INTO accounts VALUES (2, 'Bob', '500');
+
+-- Transaction with conditional logic
+BEGIN TRANSACTION;
+
+-- Check if Alice has enough balance
+SELECT * FROM accounts WHERE id = '1' AND balance >= '100';
+
+-- If balance is sufficient, proceed with transfer
+UPDATE accounts SET balance = '900' ROW 0;  -- Alice: 1000 -> 900
+UPDATE accounts SET balance = '600' ROW 1;  -- Bob: 500 -> 600
+
+-- Commit if all operations succeeded
+COMMIT;
+
+-- Verify the transfer
+SELECT * FROM accounts;
+```
+
+## Large Transaction Performance
+
+HaruDB efficiently handles bulk operations within transactions.
+
+### Bulk Insert Example
+
+```sql
+-- Create table
+CREATE TABLE logs (id, timestamp, level, message);
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Bulk insert many log entries
+INSERT INTO logs VALUES (1, '2024-01-15 10:00:00', 'INFO', 'Application started');
+INSERT INTO logs VALUES (2, '2024-01-15 10:01:00', 'INFO', 'User login: alice');
+INSERT INTO logs VALUES (3, '2024-01-15 10:02:00', 'INFO', 'User login: bob');
+INSERT INTO logs VALUES (4, '2024-01-15 10:03:00', 'WARN', 'High memory usage');
+INSERT INTO logs VALUES (5, '2024-01-15 10:04:00', 'INFO', 'User logout: alice');
+INSERT INTO logs VALUES (6, '2024-01-15 10:05:00', 'ERROR', 'Database connection failed');
+INSERT INTO logs VALUES (7, '2024-01-15 10:06:00', 'INFO', 'Database reconnected');
+INSERT INTO logs VALUES (8, '2024-01-15 10:07:00', 'INFO', 'User logout: bob');
+
+-- Commit all log entries at once
+COMMIT;
+
+-- Verify bulk insert
+SELECT COUNT(*) FROM logs;
+SELECT * FROM logs WHERE level = 'ERROR';
+```
+
+### Bulk Update Example
+
+```sql
+-- Create table
+CREATE TABLE products (id, name, price, category, discount);
+
+-- Insert data
+INSERT INTO products VALUES (1, 'Laptop', '999.99', 'Electronics', '0');
+INSERT INTO products VALUES (2, 'Mouse', '29.99', 'Electronics', '0');
+INSERT INTO products VALUES (3, 'Keyboard', '79.99', 'Electronics', '0');
+INSERT INTO products VALUES (4, 'Desk', '199.99', 'Furniture', '0');
+INSERT INTO products VALUES (5, 'Chair', '149.99', 'Furniture', '0');
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Apply 10% discount to all electronics
+UPDATE products SET discount = '10' ROW 0;  -- Laptop
+UPDATE products SET discount = '10' ROW 1;  -- Mouse
+UPDATE products SET discount = '10' ROW 2;  -- Keyboard
+
+-- Apply 15% discount to all furniture
+UPDATE products SET discount = '15' ROW 3;  -- Desk
+UPDATE products SET discount = '15' ROW 4;  -- Chair
+
+-- Commit all updates
+COMMIT;
+
+-- Verify bulk updates
+SELECT * FROM products WHERE category = 'Electronics';
+SELECT * FROM products WHERE category = 'Furniture';
+```
+
+## WAL Integration
+
+All transaction operations are automatically logged to the Write-Ahead Log (WAL) for crash recovery.
+
+### WAL Benefits
+
+1. **Crash Recovery**: If the system crashes during a transaction, WAL ensures data integrity
+2. **Atomicity**: All transaction operations are logged before being applied
+3. **Durability**: Committed changes are guaranteed to persist
+
+### WAL Example
+
+```sql
+-- Create table
+CREATE TABLE critical_data (id, value, timestamp);
+
+-- Begin transaction
+BEGIN TRANSACTION;
+
+-- Insert critical data
+INSERT INTO critical_data VALUES (1, 'Important Value 1', '2024-01-15 10:00:00');
+INSERT INTO critical_data VALUES (2, 'Important Value 2', '2024-01-15 10:01:00');
+
+-- Update data
+UPDATE critical_data SET value = 'Updated Value 1' ROW 0;
+
+-- Commit (all operations logged to WAL)
+COMMIT;
+
+-- Even if system crashes now, data is safe
+SELECT * FROM critical_data;
+```
+
+## Best Practices
+
+### Transaction Design
+
+1. **Keep transactions short**: Long transactions can cause performance issues
+2. **Use appropriate isolation levels**: Choose the lowest isolation level that meets your needs
+3. **Handle errors gracefully**: Always check for errors and rollback when necessary
+
+### Performance Optimization
+
+1. **Batch operations**: Group related operations in single transactions
+2. **Avoid unnecessary locks**: Use appropriate isolation levels
+3. **Monitor transaction duration**: Long transactions can impact performance
+
+### Data Consistency
+
+1. **Validate data before transactions**: Check constraints before beginning
+2. **Use savepoints for complex operations**: Allow partial rollbacks when needed
+3. **Test error scenarios**: Ensure your application handles transaction failures correctly
+
+## Common Transaction Patterns
+
+### Account Transfer Pattern
+
+```sql
+-- Transfer money between accounts
+BEGIN TRANSACTION;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;
+```
+
+### Order Processing Pattern
+
+```sql
+-- Process an order
+BEGIN TRANSACTION;
+INSERT INTO orders VALUES (1, 1, 1, 1, '99.99', '2024-01-15');
+UPDATE inventory SET stock = stock - 1 WHERE id = 1;
+UPDATE customers SET balance = balance - 99.99 WHERE id = 1;
+COMMIT;
+```
+
+### Audit Trail Pattern
+
+```sql
+-- Create audit trail
+BEGIN TRANSACTION;
+UPDATE users SET last_login = '2024-01-15 10:00:00' ROW 0;
+INSERT INTO audit_log VALUES (1, 'LOGIN', 'user_id=1', '2024-01-15 10:00:00');
+COMMIT;
+```
+
+For more information about HaruDB's architecture, see the [WAL documentation](/reference/wal/) and [Storage Engine documentation](/reference/storage/).
