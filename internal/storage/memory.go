@@ -20,6 +20,8 @@ type Table struct {
 	IndexedColumns []string
 	// Indexes maps column name -> value -> list of row indexes
 	Indexes map[string]map[string][]int
+	// BTreeIndexes holds a B-tree per indexed column for fast equality/range lookups
+	BTreeIndexes map[string]*BTree
 }
 
 type Database struct {
@@ -83,7 +85,7 @@ func (db *Database) CreateTable(name string, columns []string) string {
 	}
 
 	// Apply changes to memory
-	db.Tables[name] = &Table{Name: name, Columns: columns, Rows: [][]string{}, IndexedColumns: []string{}, Indexes: make(map[string]map[string][]int)}
+	db.Tables[name] = &Table{Name: name, Columns: columns, Rows: [][]string{}, IndexedColumns: []string{}, Indexes: make(map[string]map[string][]int), BTreeIndexes: make(map[string]*BTree)}
 
 	// Persist to disk
 	if err := db.saveTable(db.Tables[name]); err != nil {
@@ -368,13 +370,18 @@ func (db *Database) CreateIndex(tableName string, columnName string) string {
 		return fmt.Sprintf("Column %s not found", columnName)
 	}
 
-	// Initialize maps if needed
+	// Initialize maps if needed (hash index and B-tree index structures)
 	if table.Indexes == nil {
 		table.Indexes = make(map[string]map[string][]int)
 	}
-
 	if _, ok := table.Indexes[columnName]; !ok {
 		table.Indexes[columnName] = make(map[string][]int)
+	}
+	if table.BTreeIndexes == nil {
+		table.BTreeIndexes = make(map[string]*BTree)
+	}
+	if _, ok := table.BTreeIndexes[columnName]; !ok {
+		table.BTreeIndexes[columnName] = NewBTree()
 	}
 
 	// Add to IndexedColumns if not present
@@ -389,8 +396,9 @@ func (db *Database) CreateIndex(tableName string, columnName string) string {
 		table.IndexedColumns = append(table.IndexedColumns, columnName)
 	}
 
-	// Build index for this column
+	// Build hash index and B-tree for this column
 	db.buildIndexForColumn(table, columnName)
+	db.buildBTreeForColumn(table, columnName)
 
 	// Persist table metadata so indexes can be rebuilt on restart
 	if err := db.saveTable(table); err != nil {
@@ -411,7 +419,24 @@ func (db *Database) SelectWhere(tableName, columnName, value string) string {
 	// Header
 	result := strings.Join(table.Columns, " | ") + "\n"
 
-	// If index exists, use it
+	// If B-tree exists for this column, try it first (fast equality lookup)
+	if table.BTreeIndexes != nil {
+		if bt, ok := table.BTreeIndexes[columnName]; ok && bt != nil {
+			rowIdxs := bt.GetEqual(value)
+			if len(rowIdxs) > 0 {
+				for _, ri := range rowIdxs {
+					if ri >= 0 && ri < len(table.Rows) {
+						result += strings.Join(table.Rows[ri], " | ") + "\n"
+					}
+				}
+				return result
+			}
+			// If B-tree says no match, short-circuit with (no rows)
+			result += "(no rows)\n"
+			return result
+		}
+	}
+	// Fallback to legacy hash index
 	if table.Indexes != nil {
 		if idxMap, ok := table.Indexes[columnName]; ok {
 			if rowIdxs, ok2 := idxMap[value]; ok2 {
@@ -532,6 +557,40 @@ func (db *Database) buildIndexForColumn(table *Table, columnName string) {
 	}
 }
 
+// buildBTreeForColumn rebuilds the B-tree index for a specific column from scratch.
+func (db *Database) buildBTreeForColumn(table *Table, columnName string) {
+	if table.BTreeIndexes == nil {
+		table.BTreeIndexes = make(map[string]*BTree)
+	}
+	bt, ok := table.BTreeIndexes[columnName]
+	if !ok || bt == nil {
+		bt = NewBTree()
+		table.BTreeIndexes[columnName] = bt
+	} else {
+		// Recreate to simplify rebuild
+		bt = NewBTree()
+		table.BTreeIndexes[columnName] = bt
+	}
+	// find column index
+	colIdx := -1
+	for i, c := range table.Columns {
+		if c == columnName {
+			colIdx = i
+			break
+		}
+	}
+	if colIdx == -1 {
+		return
+	}
+	// Insert all rows into the B-tree for this column
+	for ri, row := range table.Rows {
+		if colIdx < len(row) {
+			val := row[colIdx]
+			bt.Insert(val, ri)
+		}
+	}
+}
+
 // rebuildAllIndexes rebuilds all configured indexes for a table
 func (db *Database) rebuildAllIndexes(table *Table) {
 	if table == nil || len(table.IndexedColumns) == 0 {
@@ -539,6 +598,7 @@ func (db *Database) rebuildAllIndexes(table *Table) {
 	}
 	for _, col := range table.IndexedColumns {
 		db.buildIndexForColumn(table, col)
+		db.buildBTreeForColumn(table, col)
 	}
 }
 
@@ -561,6 +621,7 @@ func (db *Database) applyIndexesOnInsert(table *Table, rowIndex int) {
 			continue
 		}
 		val := row[colIdx]
+		// Update legacy hash index
 		if table.Indexes == nil {
 			table.Indexes = make(map[string]map[string][]int)
 		}
@@ -568,6 +629,14 @@ func (db *Database) applyIndexesOnInsert(table *Table, rowIndex int) {
 			table.Indexes[col] = make(map[string][]int)
 		}
 		table.Indexes[col][val] = append(table.Indexes[col][val], rowIndex)
+		// Update B-tree index
+		if table.BTreeIndexes == nil {
+			table.BTreeIndexes = make(map[string]*BTree)
+		}
+		if _, ok := table.BTreeIndexes[col]; !ok {
+			table.BTreeIndexes[col] = NewBTree()
+		}
+		table.BTreeIndexes[col].Insert(val, rowIndex)
 	}
 }
 
