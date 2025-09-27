@@ -45,6 +45,11 @@ docker run -p 54321:54321 hareesh108/harudb:latest
 
 # Custom port
 ./harudb --data-dir ./data --port 54322
+
+# Port conflict detection
+./harudb --data-dir ./data
+# If port is in use: ⚠️  Port 54321 is already in use by: <process>
+#                   Please stop the other service or use a different port
 ```
 
 ### Docker

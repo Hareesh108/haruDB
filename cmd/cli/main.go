@@ -3,6 +3,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -13,6 +14,10 @@ import (
 )
 
 func main() {
+	port := flag.String("port", "54321", "Port to connect to")
+	host := flag.String("host", "localhost", "Host to connect to")
+	flag.Parse()
+
 	line := liner.NewLiner()
 	defer line.Close()
 	line.SetCtrlCAborts(true)
@@ -25,7 +30,8 @@ func main() {
 	}
 
 	// connect to server
-	conn, err := net.Dial("tcp", "localhost:54321")
+	serverAddr := *host + ":" + *port
+	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
 		fmt.Println("❌ Failed to connect:", err)
 		return

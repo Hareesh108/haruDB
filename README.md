@@ -595,6 +595,11 @@ haruDB/
 pkill harudb
 # Or use a different port
 ./harudb --port 54322
+
+# HaruDB automatically detects port conflicts and suggests solutions
+./harudb --data-dir ./data
+# Output: ⚠️  Port 54321 is already in use by: python3
+#         Please stop the other service or use a different port
 ```
 
 **WAL file corruption:**
