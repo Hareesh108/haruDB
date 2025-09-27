@@ -29,6 +29,12 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Examples',
+					items: [
+						{ label: 'Real-world Examples', slug: 'guides/examples' },
+					],
+				},
+				{
 					label: 'Security & Management',
 					items: [
 						{ label: 'Authentication & Users', slug: 'guides/authentication' },
