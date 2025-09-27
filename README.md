@@ -126,6 +126,48 @@ It's designed to be **client-server, TCP-based, and feature-rich**, supporting S
 
 ---
 
+## 🌟 Real-World Examples
+
+HaruDB is designed to handle complex, production-ready applications. We provide comprehensive examples that demonstrate the full capabilities of the database:
+
+### 🏦 Banking System Example
+- **Complete financial system** with customers, accounts, transactions, and loans
+- **Multi-table relationships** with foreign keys and referential integrity
+- **Financial calculations** with decimal precision and audit trails
+- **Performance optimization** with strategic indexing for high-volume transactions
+- **Sample data**: 5,000+ customers, 10,000+ accounts, 100,000+ transactions
+
+### 🍕 Food Ordering App Example (Swiggy/Zomato Style)
+- **Full e-commerce platform** with restaurants, menus, orders, and delivery tracking
+- **Complex relationships** between users, restaurants, orders, and delivery persons
+- **Real-time tracking** of delivery status and order management
+- **Review and rating system** for quality control and customer feedback
+- **Sample data**: 50,000+ users, 1,000+ restaurants, 100,000+ orders
+
+### 📁 Example Files
+- `examples/banking_system.sql` - Complete banking system schema and data
+- `examples/food_ordering_app.sql` - Full food delivery platform schema and data
+- `examples/load_examples.sh` - Interactive script to load examples
+- `docs/guides/examples/` - Comprehensive documentation with architecture diagrams
+
+### 🚀 Quick Start with Examples
+```bash
+# Start HaruDB server
+./harudb --data-dir ./data
+
+# Load examples (in another terminal)
+cd examples
+./load_examples.sh
+
+# Connect and explore
+./haru-cli
+LOGIN admin admin123
+SELECT * FROM customers;      # Banking example
+SELECT * FROM restaurants;    # Food app example
+```
+
+---
+
 ## 📦 Planned Full Features (Roadmap)
 
 | Feature                          | Status        |
