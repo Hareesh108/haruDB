@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Build and push HaruDB Docker image with both server & CLI binaries.
-# Usage: ./push-docker.sh v0.0.4
+# Usage: ./push-docker.sh v0.0.5
 #
 
 set -euo pipefail
@@ -10,7 +10,7 @@ VERSION="${1:-}"
 IMAGE_NAME="hareesh108/harudb"
 
 if [[ -z "$VERSION" ]]; then
-  echo "❌ Usage: $0 <version-tag>  (e.g. $0 v0.0.4)"
+  echo "❌ Usage: $0 <version-tag>  (e.g. $0 v0.0.5)"
   exit 1
 fi
 

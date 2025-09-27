@@ -18,7 +18,7 @@ import (
 	"github.com/Hareesh108/haruDB/internal/parser"
 )
 
-const DB_VERSION string = "v0.0.4"
+const DB_VERSION string = "v0.0.5"
 
 // checkPortUsage checks what process is using the specified port
 func checkPortUsage(port string) {

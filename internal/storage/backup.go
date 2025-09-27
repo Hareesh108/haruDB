@@ -109,7 +109,7 @@ func (bm *BackupManager) CreateBackup(backupPath string, description string) err
 	// Create backup info
 	backupInfo := BackupInfo{
 		Timestamp:   time.Now(),
-		Version:     "v0.0.4",
+		Version:     "v0.0.5",
 		TableCount:  tableCount,
 		BackupSize:  totalSize,
 		Description: description,
