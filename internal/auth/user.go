@@ -282,3 +282,17 @@ func (um *UserManager) CleanupExpiredSessions() {
 		}
 	}
 }
+
+// UpdateUserPassword updates a user's password
+func (um *UserManager) UpdateUserPassword(username, newPassword string) error {
+	um.mu.Lock()
+	defer um.mu.Unlock()
+
+	user, exists := um.users[username]
+	if !exists {
+		return fmt.Errorf("user not found")
+	}
+
+	user.PasswordHash = um.hashPassword(newPassword)
+	return um.saveUsers()
+}

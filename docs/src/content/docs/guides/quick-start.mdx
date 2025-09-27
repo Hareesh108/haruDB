@@ -87,13 +87,23 @@ haruDB>
 
 ## Your First Database Operations
 
-### 1. Create a Table
+### 1. Login to Database
+
+```sql
+-- Login with default admin credentials
+LOGIN admin admin123
+
+-- Change the default password immediately!
+CHANGE PASSWORD admin123 MySecurePassword123!
+```
+
+### 2. Create a Table
 
 ```sql
 CREATE TABLE users (id, name, email, age);
 ```
 
-### 2. Insert Data
+### 3. Insert Data
 
 ```sql
 INSERT INTO users VALUES (1, 'Alice', 'alice@example.com', '25');
@@ -101,7 +111,7 @@ INSERT INTO users VALUES (2, 'Bob', 'bob@example.com', '30');
 INSERT INTO users VALUES (3, 'Charlie', 'charlie@example.com', '35');
 ```
 
-### 3. Query Data
+### 4. Query Data
 
 ```sql
 -- Select all users
@@ -114,13 +124,13 @@ SELECT name, email FROM users;
 SELECT COUNT(*) FROM users;
 ```
 
-### 4. Create an Index for Faster Queries
+### 5. Create an Index for Faster Queries
 
 ```sql
 CREATE INDEX ON users (email);
 ```
 
-### 5. Advanced Queries with WHERE Clauses
+### 6. Advanced Queries with WHERE Clauses
 
 ```sql
 -- Equality filter (uses index)

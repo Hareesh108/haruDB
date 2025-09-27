@@ -47,6 +47,10 @@ func main() {
 		}
 	}
 
+	// Show initial help
+	fmt.Println("\n💡 Type 'HELP' for available commands")
+	fmt.Println("🔐 You need to login first: LOGIN admin admin123")
+
 	for {
 		// show CLI prompt
 		input, err := line.Prompt("haruDB> ")

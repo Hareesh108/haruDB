@@ -53,8 +53,10 @@ LOGIN readonly readpass
 
 **Notes:**
 - Default admin user: `admin` / `admin123`
+- **⚠️ SECURITY WARNING**: Change the default password immediately after first login!
 - Passwords are case-sensitive
 - Sessions are automatically managed
+- **Authentication is now REQUIRED** for all database operations
 
 ### LOGOUT
 
@@ -63,6 +65,23 @@ End the current user session.
 ```sql
 LOGOUT
 ```
+
+### CHANGE PASSWORD
+
+Change your current password.
+
+```sql
+-- Change password
+CHANGE PASSWORD old_password new_password
+
+-- Example
+CHANGE PASSWORD admin123 mynewpassword
+```
+
+**Notes:**
+- You must be logged in to change your password
+- Old password must be correct
+- New password will be hashed and stored securely
 
 ### CREATE USER
 
@@ -394,5 +413,45 @@ LOGIN username password
 - **"User not found"**: Username doesn't exist
 - **"Insufficient permissions"**: User role doesn't allow operation
 - **"Session expired"**: User session has timed out
+
+## Security Best Practices
+
+### First-Time Setup
+
+1. **Change Default Password**: Immediately change the default admin password after first login
+2. **Create Additional Users**: Create specific users for different roles instead of using admin for everything
+3. **Use Strong Passwords**: Use complex passwords with mixed case, numbers, and symbols
+4. **Regular Password Updates**: Change passwords periodically
+
+### Production Deployment
+
+1. **Enable TLS**: Use `--tls` flag for encrypted connections
+2. **Network Security**: Restrict database access to trusted networks only
+3. **Regular Backups**: Implement automated backup procedures
+4. **Monitor Access**: Regularly review user accounts and sessions
+5. **Remove Default Users**: Consider removing or disabling default accounts after setup
+
+### Example Secure Setup
+
+```sql
+-- 1. Login with default admin
+LOGIN admin admin123
+
+-- 2. Change admin password immediately
+CHANGE PASSWORD admin123 MySecurePassword123!
+
+-- 3. Create application user
+CREATE USER app_user AppPassword123 USER
+
+-- 4. Create readonly user for monitoring
+CREATE USER monitor MonitorPass456 READONLY
+
+-- 5. List users to verify
+LIST USERS
+
+-- 6. Logout and test with new credentials
+LOGOUT
+LOGIN app_user AppPassword123
+```
 
 For more information about HaruDB's security features, see the [TLS documentation](/guides/tls/) and [Backup documentation](/guides/backup-restore/).

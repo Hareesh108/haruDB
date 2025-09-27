@@ -12,7 +12,9 @@ import (
 )
 
 const (
-	ErrSyntaxError = "Syntax error"
+	ErrSyntaxError             = "Syntax error"
+	ErrNotAuthenticated        = "Please login first: LOGIN username password"
+	ErrInsufficientPermissions = "Insufficient permissions for this operation"
 )
 
 type Engine struct {
@@ -30,11 +32,49 @@ func NewEngine(dataDir string) *Engine {
 	}
 }
 
+// requireAuth checks if user is authenticated
+func (e *Engine) requireAuth() string {
+	if e.CurrentSession == nil {
+		return ErrNotAuthenticated
+	}
+	return ""
+}
+
+// requireAdmin checks if user is authenticated and has admin privileges
+func (e *Engine) requireAdmin() string {
+	if e.CurrentSession == nil {
+		return ErrNotAuthenticated
+	}
+	if e.CurrentSession.Role != auth.RoleAdmin {
+		return ErrInsufficientPermissions
+	}
+	return ""
+}
+
+// isAuthCommand checks if the command is authentication-related
+func (e *Engine) isAuthCommand(upper string) bool {
+	return strings.HasPrefix(upper, "LOGIN") ||
+		strings.HasPrefix(upper, "LOGOUT") ||
+		strings.HasPrefix(upper, "CREATE USER") ||
+		strings.HasPrefix(upper, "DROP USER") ||
+		strings.HasPrefix(upper, "LIST USERS") ||
+		strings.HasPrefix(upper, "CHANGE PASSWORD") ||
+		strings.HasPrefix(upper, "HELP") ||
+		strings.HasPrefix(upper, "EXIT")
+}
+
 func (e *Engine) Execute(input string) string {
 	input = strings.TrimSpace(input)
 	input = strings.TrimSuffix(input, ";") // remove trailing semicolon
 
 	upper := strings.ToUpper(input)
+
+	// Check if command requires authentication
+	if !e.isAuthCommand(upper) {
+		if err := e.requireAuth(); err != "" {
+			return err
+		}
+	}
 
 	switch {
 	case strings.HasPrefix(upper, "BEGIN"):
@@ -295,6 +335,14 @@ func (e *Engine) Execute(input string) string {
 	case strings.HasPrefix(upper, "LIST BACKUPS"):
 		// LIST BACKUPS [directory]
 		return e.handleListBackups(input)
+
+	case strings.HasPrefix(upper, "CHANGE PASSWORD"):
+		// CHANGE PASSWORD old_password new_password
+		return e.handleChangePassword(input)
+
+	case strings.HasPrefix(upper, "HELP"):
+		// HELP
+		return e.handleHelp()
 
 	default:
 		return "Unknown command"
@@ -626,4 +674,72 @@ func (e *Engine) handleListBackups(input string) string {
 	}
 
 	return result
+}
+
+// handleChangePassword handles CHANGE PASSWORD commands
+func (e *Engine) handleChangePassword(input string) string {
+	parts := strings.Fields(input)
+	if len(parts) < 4 {
+		return "Syntax error: CHANGE PASSWORD old_password new_password"
+	}
+
+	oldPassword := parts[2]
+	newPassword := parts[3]
+
+	// Verify old password
+	user, err := e.UserManager.AuthenticateUser(e.CurrentSession.Username, oldPassword)
+	if err != nil {
+		return "Invalid old password"
+	}
+
+	// Update password
+	err = e.UserManager.UpdateUserPassword(user.Username, newPassword)
+	if err != nil {
+		return fmt.Sprintf("Failed to change password: %v", err)
+	}
+
+	return "Password changed successfully"
+}
+
+// handleHelp handles HELP commands
+func (e *Engine) handleHelp() string {
+	helpText := `HaruDB Commands:
+
+Authentication:
+  LOGIN username password          - Login to database
+  LOGOUT                          - Logout from database
+  CHANGE PASSWORD old new         - Change your password
+  CREATE USER user pass [role]    - Create new user (Admin only)
+  DROP USER username              - Delete user (Admin only)
+  LIST USERS                      - List all users (Admin only)
+
+Database Operations:
+  CREATE TABLE name (col1, col2)  - Create table
+  DROP TABLE name                 - Drop table
+  INSERT INTO table VALUES (...)  - Insert data
+  SELECT * FROM table             - Query data
+  UPDATE table SET col=val ROW n  - Update row
+  DELETE FROM table ROW n         - Delete row
+  CREATE INDEX ON table (col)     - Create index
+
+Transactions:
+  BEGIN TRANSACTION               - Start transaction
+  COMMIT                         - Commit transaction
+  ROLLBACK                       - Rollback transaction
+  SAVEPOINT name                  - Create savepoint
+
+Backup & Restore:
+  BACKUP [TO path] [DESC desc]   - Create backup
+  RESTORE FROM path               - Restore from backup
+  LIST BACKUPS [dir]              - List backups
+  BACKUP INFO path                - Show backup info
+
+Other:
+  HELP                           - Show this help
+  EXIT                           - Exit database
+
+Default admin: admin / admin123
+Please change the default password after first login!`
+
+	return helpText
 }

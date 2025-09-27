@@ -78,7 +78,9 @@ func handleConnection(conn net.Conn, engine *parser.Engine) {
 	defer conn.Close()
 
 	fmt.Fprintf(conn, "\nWelcome to HaruDB %s 🎉\n", DB_VERSION)
-	conn.Write([]byte("Type 'exit' to quit.\n\n"))
+	conn.Write([]byte("🔐 Authentication Required\n"))
+	conn.Write([]byte("Default admin: admin / admin123\n"))
+	conn.Write([]byte("Please change the default password after first login!\n\n"))
 
 	scanner := bufio.NewScanner(conn)
 	for {
