@@ -17,4 +17,4 @@ npm run build
 npm run preview
 ```
 
-The site is configured in `astro.config.mjs` and content lives under `src/content/docs`.
+<!-- The site is configured in `astro.config.mjs` and content lives under `src/content/docs`. -->
