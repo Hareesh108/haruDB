@@ -1,0 +1,19 @@
+𝐇𝐚𝐫𝐮𝐃𝐁 — 𝐀 𝐂𝐮𝐬𝐭𝐨𝐦 𝐃𝐚𝐭𝐚𝐛𝐚𝐬𝐞 𝐁𝐮𝐢𝐥𝐭 𝐟𝐫𝐨𝐦 𝐒𝐜𝐫𝐚𝐭𝐜𝐡 𝐢𝐧 𝐆𝐨
+
+This is not production-ready — it’s a learning-focused, from-scratch implementation of core database concepts.
+
+💡 Why HaruDB?
+This project is about learning database internals by building one:
+
+• 𝐖𝐀𝐋 (𝐖𝐫𝐢𝐭𝐞-𝐀𝐡𝐞𝐚𝐝 𝐋𝐨𝐠𝐠𝐢𝐧𝐠)
+• 𝐓𝐫𝐚𝐧𝐬𝐚𝐜𝐭𝐢𝐨𝐧𝐬
+• 𝐈𝐧𝐝𝐞𝐱𝐢𝐧𝐠
+• 𝐂𝐫𝐚𝐬𝐡 𝐫𝐞𝐜𝐨𝐯𝐞𝐫𝐲
+• 𝐀𝐂𝐈𝐃 𝐠𝐮𝐚𝐫𝐚𝐧𝐭𝐞𝐞𝐬
+
+If you’re interested in databases, Go, or systems engineering, feel free to explore or contribute.
+
+🌐 Website: https://haru-db.vercel.app
+💻 GitHub: https://github.com/Hareesh108/haruDB
+
+#GoLang #Databases #SystemDesign #Backend #OpenSource #ACID #WAL #PostgreSQL #SQLite #Experimental
